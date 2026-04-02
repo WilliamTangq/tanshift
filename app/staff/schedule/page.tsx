@@ -64,29 +64,14 @@ function addDays(dateString: string, days: number) {
   return formatLocalDate(date);
 }
 
-function calculateMinutes(start: string, end: string) {
+function calculateHours(start: string, end: string) {
   const [startHour, startMinute] = start.split(":").map(Number);
   const [endHour, endMinute] = end.split(":").map(Number);
 
   const startTotal = startHour * 60 + startMinute;
   const endTotal = endHour * 60 + endMinute;
 
-  return Math.max(endTotal - startTotal, 0);
-}
-
-function formatMinutes(totalMinutes: number) {
-  const hours = Math.floor(totalMinutes / 60);
-  const mins = totalMinutes % 60;
-
-  if (hours === 0) {
-    return `${mins} mins`;
-  }
-
-  if (mins === 0) {
-    return `${hours} hours`;
-  }
-
-  return `${hours} hours ${mins} mins`;
+  return Math.max((endTotal - startTotal) / 60, 0);
 }
 
 export default function StaffSchedulePage() {
@@ -95,6 +80,7 @@ export default function StaffSchedulePage() {
   const [weekStartDate, setWeekStartDate] = useState(getNextMondayDate());
   const [shifts, setShifts] = useState<ShiftRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [infoMessage, setInfoMessage] = useState("");
 
   useEffect(() => {
     async function loadStaff() {
@@ -118,6 +104,7 @@ export default function StaffSchedulePage() {
     async function loadSchedule() {
       if (!selectedStaffId || !weekStartDate) {
         setShifts([]);
+        setInfoMessage("");
         setLoading(false);
         return;
       }
@@ -128,20 +115,23 @@ export default function StaffSchedulePage() {
         .from("schedule_weeks")
         .select("id")
         .eq("week_start_date", weekStartDate)
+        .eq("status", "published")
         .maybeSingle();
 
-      if (weekError) {
-        console.error("Failed to load schedule week:", weekError);
-        setShifts([]);
-        setLoading(false);
-        return;
-      }
-
-      if (!weekData) {
-        setShifts([]);
-        setLoading(false);
-        return;
-      }
+        if (weekError) {
+          console.error("Failed to load schedule week:", weekError);
+          setShifts([]);
+          setInfoMessage("Failed to load published schedule.");
+          setLoading(false);
+          return;
+        }
+  
+        if (!weekData) {
+          setShifts([]);
+          setInfoMessage("No published schedule for this week yet.");
+          setLoading(false);
+          return;
+        }
 
       const { data: shiftData, error: shiftError } = await supabase
         .from("scheduled_shifts")
@@ -151,12 +141,14 @@ export default function StaffSchedulePage() {
         .order("shift_date", { ascending: true })
         .order("shift_start", { ascending: true });
 
-      if (shiftError) {
-        console.error("Failed to load staff schedule:", shiftError);
-        setShifts([]);
-      } else {
-        setShifts((shiftData as ShiftRow[]) || []);
-      }
+        if (shiftError) {
+          console.error("Failed to load staff schedule:", shiftError);
+          setShifts([]);
+          setInfoMessage("Failed to load shifts.");
+        } else {
+          setShifts((shiftData as ShiftRow[]) || []);
+          setInfoMessage("");
+        }
 
       setLoading(false);
     }
@@ -175,9 +167,9 @@ export default function StaffSchedulePage() {
     return result;
   }, [shifts, weekStartDate]);
 
-  const totalMinutes = useMemo(() => {
+  const totalHours = useMemo(() => {
     return shifts.reduce((sum, shift) => {
-      return sum + calculateMinutes(shift.shift_start, shift.shift_end);
+      return sum + calculateHours(shift.shift_start, shift.shift_end);
     }, 0);
   }, [shifts]);
 
@@ -242,7 +234,7 @@ export default function StaffSchedulePage() {
               </div>
 
               <div className="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700">
-                Total: {formatMinutes(totalMinutes)}
+                Total: {totalHours.toFixed(1)}h
               </div>
             </div>
           </div>
@@ -255,6 +247,8 @@ export default function StaffSchedulePage() {
             <p className="text-sm text-slate-600">
               Select a staff member to view schedule.
             </p>
+          ) : infoMessage ? (
+            <p className="mt-2 text-sm text-slate-600">{infoMessage}</p>
           ) : (
             <div className="space-y-4">
               {DAYS.map((day) => {
@@ -287,12 +281,7 @@ export default function StaffSchedulePage() {
                               {shift.shift_start} - {shift.shift_end}
                             </p>
                             <p className="mt-1 text-xs text-slate-500">
-                              {formatMinutes(
-                                calculateMinutes(
-                                  shift.shift_start,
-                                  shift.shift_end,
-                                ),
-                              )}
+                              {(calculateHours(shift.shift_start, shift.shift_end)).toFixed(1)} hours
                             </p>
                           </div>
                         ))}

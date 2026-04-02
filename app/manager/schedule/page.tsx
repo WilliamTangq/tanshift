@@ -92,29 +92,14 @@ function addDays(dateString: string, days: number) {
   return formatLocalDate(date);
 }
 
-function calculateMinutes(start: string, end: string) {
+function calculateHours(start: string, end: string) {
   const [startHour, startMinute] = start.split(":").map(Number);
   const [endHour, endMinute] = end.split(":").map(Number);
 
   const startTotal = startHour * 60 + startMinute;
   const endTotal = endHour * 60 + endMinute;
 
-  return Math.max(endTotal - startTotal, 0);
-}
-
-function formatMinutes(totalMinutes: number) {
-  const hours = Math.floor(totalMinutes / 60);
-  const mins = totalMinutes % 60;
-
-  if (hours === 0) {
-    return `${mins} mins`;
-  }
-
-  if (mins === 0) {
-    return `${hours} hours`;
-  }
-
-  return `${hours} hours ${mins} mins`;
+  return Math.max((endTotal - startTotal) / 60, 0);
 }
 
 export default function SchedulePage() {
@@ -290,14 +275,13 @@ export default function SchedulePage() {
     return Object.fromEntries(staff.map((member) => [member.id, member.name]));
   }, [staff]);
 
-  const weeklyMinutes = useMemo(() => {
+  const weeklyHours = useMemo(() => {
     const totals: Record<string, number> = {};
 
     for (const shift of shifts) {
       if (!shift.assigned_staff_id) continue;
-      const minutes = calculateMinutes(shift.shift_start, shift.shift_end);
-      totals[shift.assigned_staff_id] =
-        (totals[shift.assigned_staff_id] || 0) + minutes;
+      const hours = calculateHours(shift.shift_start, shift.shift_end);
+      totals[shift.assigned_staff_id] = (totals[shift.assigned_staff_id] || 0) + hours;
     }
 
     return totals;
@@ -531,7 +515,7 @@ export default function SchedulePage() {
                         </p>
                       </div>
                       <p className="text-sm font-semibold text-slate-700">
-                        {formatMinutes(weeklyMinutes[member.id] || 0)}
+                        {(weeklyHours[member.id] || 0).toFixed(1)}h
                       </p>
                     </div>
                   </div>
