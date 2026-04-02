@@ -16,6 +16,20 @@ type StaffProfile = {
   priority_level: "high" | "medium" | "low";
 };
 
+type AvailabilitySubmission = {
+  id: string;
+  staff_id: string;
+  week_start_date: string;
+};
+
+type AvailabilitySlot = {
+  id: string;
+  submission_id: string;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+};
+
 type ScheduleWeek = {
   id: string;
   week_start_date: string;
@@ -88,6 +102,21 @@ function calculateHours(start: string, end: string) {
   return Math.max((endTotal - startTotal) / 60, 0);
 }
 
+/** Monday = 1 … Sunday = 7 (matches `availability_slots.day_of_week`). */
+function dateToAvailabilityDay(dateString: string) {
+  const jsDay = parseLocalDate(dateString).getDay();
+  return jsDay === 0 ? 7 : jsDay;
+}
+
+function timeRangesOverlap(
+  aStart: string,
+  aEnd: string,
+  bStart: string,
+  bEnd: string
+) {
+  return aStart < bEnd && bStart < aEnd;
+}
+
 export default function SchedulePage() {
   const [stores, setStores] = useState<Store[]>([]);
   const [staff, setStaff] = useState<StaffProfile[]>([]);
@@ -104,6 +133,9 @@ export default function SchedulePage() {
   const [assignedStaffId, setAssignedStaffId] = useState("");
   const [shiftStart, setShiftStart] = useState("10:30");
   const [shiftEnd, setShiftEnd] = useState("21:15");
+
+  const [availabilitySubmissions, setAvailabilitySubmissions] = useState<AvailabilitySubmission[]>([]);
+  const [availabilitySlots, setAvailabilitySlots] = useState<AvailabilitySlot[]>([]);
 
   useEffect(() => {
     async function loadInitialData() {
@@ -139,6 +171,56 @@ export default function SchedulePage() {
     if (!selectedStoreId || !weekStartDate) return;
     loadScheduleWeek(selectedStoreId, weekStartDate);
   }, [selectedStoreId, weekStartDate]);
+
+  useEffect(() => {
+    if (!weekStartDate) return;
+
+    let cancelled = false;
+
+    async function loadAvailabilityForWeek() {
+      const { data: subData, error: subError } = await supabase
+        .from("availability_submissions")
+        .select("id, staff_id, week_start_date")
+        .eq("week_start_date", weekStartDate)
+        .eq("status", "submitted");
+
+      if (subError) {
+        console.error("Failed to load availability submissions:", subError);
+        return;
+      }
+
+      const submissions = (subData as AvailabilitySubmission[]) || [];
+      const submissionIds = submissions.map((s) => s.id);
+
+      if (submissionIds.length === 0) {
+        if (!cancelled) {
+          setAvailabilitySubmissions([]);
+          setAvailabilitySlots([]);
+        }
+        return;
+      }
+
+      const { data: slotData, error: slotError } = await supabase
+        .from("availability_slots")
+        .select("*")
+        .in("submission_id", submissionIds);
+
+      if (slotError) {
+        console.error("Failed to load availability slots:", slotError);
+        return;
+      }
+
+      if (!cancelled) {
+        setAvailabilitySubmissions(submissions);
+        setAvailabilitySlots((slotData as AvailabilitySlot[]) || []);
+      }
+    }
+
+    loadAvailabilityForWeek();
+    return () => {
+      cancelled = true;
+    };
+  }, [weekStartDate]);
 
   async function loadScheduleWeek(storeId: string, weekDate: string) {
     setLoading(true);
@@ -248,9 +330,59 @@ export default function SchedulePage() {
     }
   }
 
+  
+
+  const departmentStaff = useMemo(
+    () => staff.filter((member) => member.department === department),
+    [staff, department]
+  );
+
   const filteredStaff = useMemo(() => {
-    return staff.filter((member) => member.department === department);
-  }, [staff, department]);
+    const available: StaffProfile[] = [];
+    const unavailable: StaffProfile[] = [];
+
+    const dayNum = dateToAvailabilityDay(shiftDate);
+    const submissionsByStaff = new Map<string, AvailabilitySubmission[]>();
+
+    for (const sub of availabilitySubmissions) {
+      const list = submissionsByStaff.get(sub.staff_id) ?? [];
+      list.push(sub);
+      submissionsByStaff.set(sub.staff_id, list);
+    }
+
+    for (const member of departmentStaff) {
+      const subs = submissionsByStaff.get(member.id);
+      if (!subs?.length) {
+        unavailable.push(member);
+        continue;
+      }
+
+      const subIds = new Set(subs.map((s) => s.id));
+      const slotsForShiftDay = availabilitySlots.filter(
+        (slot) =>
+          subIds.has(slot.submission_id) && slot.day_of_week === dayNum
+      );
+
+      const overlaps = slotsForShiftDay.some((slot) =>
+        timeRangesOverlap(shiftStart, shiftEnd, slot.start_time, slot.end_time)
+      );
+
+      if (overlaps) {
+        available.push(member);
+      } else {
+        unavailable.push(member);
+      }
+    }
+
+    return { available, unavailable };
+  }, [
+    departmentStaff,
+    shiftDate,
+    shiftStart,
+    shiftEnd,
+    availabilitySubmissions,
+    availabilitySlots,
+  ]);
 
   const staffNameMap = useMemo(() => {
     return Object.fromEntries(staff.map((member) => [member.id, member.name]));
@@ -365,12 +497,16 @@ export default function SchedulePage() {
                   className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-500"
                 >
                   <option value="">Select staff</option>
-                  {filteredStaff.map((member) => (
+                  {departmentStaff.map((member) => (
                     <option key={member.id} value={member.id}>
                       {member.name} · {member.skill_level}
                     </option>
                   ))}
                 </select>
+                <p className="mt-2 text-xs text-slate-500">
+                  Available: {filteredStaff.available.length} · Unavailable:{" "}
+                  {filteredStaff.unavailable.length}
+                </p>
               </div>
 
               <div className="grid gap-3 md:grid-cols-2">
