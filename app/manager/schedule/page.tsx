@@ -102,21 +102,6 @@ function calculateHours(start: string, end: string) {
   return Math.max((endTotal - startTotal) / 60, 0);
 }
 
-/** Monday = 1 … Sunday = 7 (matches `availability_slots.day_of_week`). */
-function dateToAvailabilityDay(dateString: string) {
-  const jsDay = parseLocalDate(dateString).getDay();
-  return jsDay === 0 ? 7 : jsDay;
-}
-
-function timeRangesOverlap(
-  aStart: string,
-  aEnd: string,
-  bStart: string,
-  bEnd: string
-) {
-  return aStart < bEnd && bStart < aEnd;
-}
-
 export default function SchedulePage() {
   const [stores, setStores] = useState<Store[]>([]);
   const [staff, setStaff] = useState<StaffProfile[]>([]);
@@ -171,56 +156,6 @@ export default function SchedulePage() {
     if (!selectedStoreId || !weekStartDate) return;
     loadScheduleWeek(selectedStoreId, weekStartDate);
   }, [selectedStoreId, weekStartDate]);
-
-  useEffect(() => {
-    if (!weekStartDate) return;
-
-    let cancelled = false;
-
-    async function loadAvailabilityForWeek() {
-      const { data: subData, error: subError } = await supabase
-        .from("availability_submissions")
-        .select("id, staff_id, week_start_date")
-        .eq("week_start_date", weekStartDate)
-        .eq("status", "submitted");
-
-      if (subError) {
-        console.error("Failed to load availability submissions:", subError);
-        return;
-      }
-
-      const submissions = (subData as AvailabilitySubmission[]) || [];
-      const submissionIds = submissions.map((s) => s.id);
-
-      if (submissionIds.length === 0) {
-        if (!cancelled) {
-          setAvailabilitySubmissions([]);
-          setAvailabilitySlots([]);
-        }
-        return;
-      }
-
-      const { data: slotData, error: slotError } = await supabase
-        .from("availability_slots")
-        .select("*")
-        .in("submission_id", submissionIds);
-
-      if (slotError) {
-        console.error("Failed to load availability slots:", slotError);
-        return;
-      }
-
-      if (!cancelled) {
-        setAvailabilitySubmissions(submissions);
-        setAvailabilitySlots((slotData as AvailabilitySlot[]) || []);
-      }
-    }
-
-    loadAvailabilityForWeek();
-    return () => {
-      cancelled = true;
-    };
-  }, [weekStartDate]);
 
   async function loadScheduleWeek(storeId: string, weekDate: string) {
     setLoading(true);
@@ -332,60 +267,19 @@ export default function SchedulePage() {
 
   
 
-  const departmentStaff = useMemo(
-    () => staff.filter((member) => member.department === department),
-    [staff, department]
-  );
-
   const filteredStaff = useMemo(() => {
-    const available: StaffProfile[] = [];
-    const unavailable: StaffProfile[] = [];
-
-    const dayNum = dateToAvailabilityDay(shiftDate);
-    const submissionsByStaff = new Map<string, AvailabilitySubmission[]>();
-
-    for (const sub of availabilitySubmissions) {
-      const list = submissionsByStaff.get(sub.staff_id) ?? [];
-      list.push(sub);
-      submissionsByStaff.set(sub.staff_id, list);
-    }
-
-    for (const member of departmentStaff) {
-      const subs = submissionsByStaff.get(member.id);
-      if (!subs?.length) {
-        unavailable.push(member);
-        continue;
-      }
-
-      const subIds = new Set(subs.map((s) => s.id));
-      const slotsForShiftDay = availabilitySlots.filter(
-        (slot) =>
-          subIds.has(slot.submission_id) && slot.day_of_week === dayNum
-      );
-
-      const overlaps = slotsForShiftDay.some((slot) =>
-        timeRangesOverlap(shiftStart, shiftEnd, slot.start_time, slot.end_time)
-      );
-
-      if (overlaps) {
-        available.push(member);
-      } else {
-        unavailable.push(member);
-      }
-    }
-
-    return { available, unavailable };
-  }, [
-    departmentStaff,
-    shiftDate,
-    shiftStart,
-    shiftEnd,
-    availabilitySubmissions,
-    availabilitySlots,
-  ]);
+    return staff.filter((member) => member.department === department);
+  }, [staff, department]);
 
   const staffNameMap = useMemo(() => {
     return Object.fromEntries(staff.map((member) => [member.id, member.name]));
+  }, [staff]);
+
+  const staffById = useMemo(() => {
+    return Object.fromEntries(staff.map((m) => [m.id, m])) as Record<
+      string,
+      StaffProfile
+    >;
   }, [staff]);
 
   const weeklyHours = useMemo(() => {
@@ -497,16 +391,12 @@ export default function SchedulePage() {
                   className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-500"
                 >
                   <option value="">Select staff</option>
-                  {departmentStaff.map((member) => (
+                  {filteredStaff.map((member) => (
                     <option key={member.id} value={member.id}>
                       {member.name} · {member.skill_level}
                     </option>
                   ))}
                 </select>
-                <p className="mt-2 text-xs text-slate-500">
-                  Available: {filteredStaff.available.length} · Unavailable:{" "}
-                  {filteredStaff.unavailable.length}
-                </p>
               </div>
 
               <div className="grid gap-3 md:grid-cols-2">
@@ -561,6 +451,18 @@ export default function SchedulePage() {
                   const date = addDays(weekStartDate, day.value);
                   const dayShifts = groupedByDay[date] || [];
 
+                  const deptHasAllRounder = (dept: "front" | "kitchen") =>
+                    dayShifts.some((shift) => {
+                      if (shift.department !== dept || !shift.assigned_staff_id) {
+                        return false;
+                      }
+                      const member = staffById[shift.assigned_staff_id];
+                      return member?.skill_level === "all_rounder";
+                    });
+
+                  const frontCovered = deptHasAllRounder("front");
+                  const kitchenCovered = deptHasAllRounder("kitchen");
+
                   return (
                     <div
                       key={date}
@@ -571,6 +473,32 @@ export default function SchedulePage() {
                           {day.label}
                         </h3>
                         <span className="text-sm text-slate-500">{date}</span>
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <span
+                          className={`rounded-full px-3 py-1 text-xs font-medium ${
+                            frontCovered
+                              ? "bg-green-100 text-green-700"
+                              : "bg-red-100 text-red-700"
+                          }`}
+                        >
+                          {frontCovered
+                            ? "Front covered"
+                            : "Front missing all-rounder"}
+                        </span>
+
+                        <span
+                          className={`rounded-full px-3 py-1 text-xs font-medium ${
+                            kitchenCovered
+                              ? "bg-green-100 text-green-700"
+                              : "bg-red-100 text-red-700"
+                          }`}
+                        >
+                          {kitchenCovered
+                            ? "Kitchen covered"
+                            : "Kitchen missing all-rounder"}
+                        </span>
                       </div>
 
                       {dayShifts.length === 0 ? (
