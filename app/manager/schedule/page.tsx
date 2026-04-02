@@ -92,14 +92,29 @@ function addDays(dateString: string, days: number) {
   return formatLocalDate(date);
 }
 
-function calculateHours(start: string, end: string) {
+function calculateMinutes(start: string, end: string) {
   const [startHour, startMinute] = start.split(":").map(Number);
   const [endHour, endMinute] = end.split(":").map(Number);
 
   const startTotal = startHour * 60 + startMinute;
   const endTotal = endHour * 60 + endMinute;
 
-  return Math.max((endTotal - startTotal) / 60, 0);
+  return Math.max(endTotal - startTotal, 0);
+}
+
+function formatMinutes(totalMinutes: number) {
+  const hours = Math.floor(totalMinutes / 60);
+  const mins = totalMinutes % 60;
+
+  if (hours === 0) {
+    return `${mins} mins`;
+  }
+
+  if (mins === 0) {
+    return `${hours} hours`;
+  }
+
+  return `${hours} hours ${mins} mins`;
 }
 
 export default function SchedulePage() {
@@ -275,20 +290,14 @@ export default function SchedulePage() {
     return Object.fromEntries(staff.map((member) => [member.id, member.name]));
   }, [staff]);
 
-  const staffById = useMemo(() => {
-    return Object.fromEntries(staff.map((m) => [m.id, m])) as Record<
-      string,
-      StaffProfile
-    >;
-  }, [staff]);
-
-  const weeklyHours = useMemo(() => {
+  const weeklyMinutes = useMemo(() => {
     const totals: Record<string, number> = {};
 
     for (const shift of shifts) {
       if (!shift.assigned_staff_id) continue;
-      const hours = calculateHours(shift.shift_start, shift.shift_end);
-      totals[shift.assigned_staff_id] = (totals[shift.assigned_staff_id] || 0) + hours;
+      const minutes = calculateMinutes(shift.shift_start, shift.shift_end);
+      totals[shift.assigned_staff_id] =
+        (totals[shift.assigned_staff_id] || 0) + minutes;
     }
 
     return totals;
@@ -451,18 +460,6 @@ export default function SchedulePage() {
                   const date = addDays(weekStartDate, day.value);
                   const dayShifts = groupedByDay[date] || [];
 
-                  const deptHasAllRounder = (dept: "front" | "kitchen") =>
-                    dayShifts.some((shift) => {
-                      if (shift.department !== dept || !shift.assigned_staff_id) {
-                        return false;
-                      }
-                      const member = staffById[shift.assigned_staff_id];
-                      return member?.skill_level === "all_rounder";
-                    });
-
-                  const frontCovered = deptHasAllRounder("front");
-                  const kitchenCovered = deptHasAllRounder("kitchen");
-
                   return (
                     <div
                       key={date}
@@ -473,32 +470,6 @@ export default function SchedulePage() {
                           {day.label}
                         </h3>
                         <span className="text-sm text-slate-500">{date}</span>
-                      </div>
-
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <span
-                          className={`rounded-full px-3 py-1 text-xs font-medium ${
-                            frontCovered
-                              ? "bg-green-100 text-green-700"
-                              : "bg-red-100 text-red-700"
-                          }`}
-                        >
-                          {frontCovered
-                            ? "Front covered"
-                            : "Front missing all-rounder"}
-                        </span>
-
-                        <span
-                          className={`rounded-full px-3 py-1 text-xs font-medium ${
-                            kitchenCovered
-                              ? "bg-green-100 text-green-700"
-                              : "bg-red-100 text-red-700"
-                          }`}
-                        >
-                          {kitchenCovered
-                            ? "Kitchen covered"
-                            : "Kitchen missing all-rounder"}
-                        </span>
                       </div>
 
                       {dayShifts.length === 0 ? (
@@ -560,7 +531,7 @@ export default function SchedulePage() {
                         </p>
                       </div>
                       <p className="text-sm font-semibold text-slate-700">
-                        {(weeklyHours[member.id] || 0).toFixed(1)}h
+                        {formatMinutes(weeklyMinutes[member.id] || 0)}
                       </p>
                     </div>
                   </div>
