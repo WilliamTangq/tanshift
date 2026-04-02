@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
 type StaffProfile = {
@@ -81,6 +81,7 @@ export default function StaffSchedulePage() {
   const [shifts, setShifts] = useState<ShiftRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [infoMessage, setInfoMessage] = useState("");
+  const pollTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     async function loadStaff() {
@@ -101,15 +102,18 @@ export default function StaffSchedulePage() {
   }, []);
 
   useEffect(() => {
-    async function loadSchedule() {
+    let cancelled = false;
+
+    async function fetchSchedule({ showLoading }: { showLoading: boolean }) {
       if (!selectedStaffId || !weekStartDate) {
+        if (cancelled) return;
         setShifts([]);
         setInfoMessage("");
-        setLoading(false);
+        if (showLoading) setLoading(false);
         return;
       }
 
-      setLoading(true);
+      if (showLoading) setLoading(true);
 
       const { data: weekData, error: weekError } = await supabase
         .from("schedule_weeks")
@@ -118,20 +122,21 @@ export default function StaffSchedulePage() {
         .eq("status", "published")
         .maybeSingle();
 
-        if (weekError) {
-          console.error("Failed to load schedule week:", weekError);
-          setShifts([]);
-          setInfoMessage("Failed to load published schedule.");
-          setLoading(false);
-          return;
-        }
-  
-        if (!weekData) {
-          setShifts([]);
-          setInfoMessage("No published schedule for this week yet.");
-          setLoading(false);
-          return;
-        }
+      if (cancelled) return;
+
+      if (weekError) {
+        console.error("Failed to load schedule week:", weekError);
+        setShifts([]);
+        if (showLoading) setLoading(false);
+        return;
+      }
+
+      if (!weekData) {
+        setShifts([]);
+        setInfoMessage("Employer not published yet");
+        if (showLoading) setLoading(false);
+        return;
+      }
 
       const { data: shiftData, error: shiftError } = await supabase
         .from("scheduled_shifts")
@@ -141,19 +146,38 @@ export default function StaffSchedulePage() {
         .order("shift_date", { ascending: true })
         .order("shift_start", { ascending: true });
 
-        if (shiftError) {
-          console.error("Failed to load staff schedule:", shiftError);
-          setShifts([]);
-          setInfoMessage("Failed to load shifts.");
-        } else {
-          setShifts((shiftData as ShiftRow[]) || []);
-          setInfoMessage("");
-        }
+      if (cancelled) return;
 
-      setLoading(false);
+      if (shiftError) {
+        console.error("Failed to load staff schedule:", shiftError);
+        setShifts([]);
+      } else {
+        setShifts((shiftData as ShiftRow[]) || []);
+      }
+
+      setInfoMessage("");
+      if (showLoading) setLoading(false);
     }
 
-    loadSchedule();
+    // Initial load
+    fetchSchedule({ showLoading: true });
+
+    // Keep staff view in sync after manager publish/unpublish.
+    if (pollTimerRef.current) {
+      window.clearInterval(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
+    pollTimerRef.current = window.setInterval(() => {
+      fetchSchedule({ showLoading: false });
+    }, 10000);
+
+    return () => {
+      cancelled = true;
+      if (pollTimerRef.current) {
+        window.clearInterval(pollTimerRef.current);
+        pollTimerRef.current = null;
+      }
+    };
   }, [selectedStaffId, weekStartDate]);
 
   const groupedByDay = useMemo(() => {
@@ -248,7 +272,7 @@ export default function StaffSchedulePage() {
               Select a staff member to view schedule.
             </p>
           ) : infoMessage ? (
-            <p className="mt-2 text-sm text-slate-600">{infoMessage}</p>
+            <p className="text-sm text-slate-600">{infoMessage}</p>
           ) : (
             <div className="space-y-4">
               {DAYS.map((day) => {
