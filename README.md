@@ -1,36 +1,84 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🧠 TanShift – Smart Staff Scheduling SaaS
 
-## Getting Started
+TanShift is a web-based staff scheduling system designed to help small businesses (e.g. restaurants, retail stores) manage employee shifts efficiently.
 
-First, run the development server:
+It replaces manual scheduling (Excel, WhatsApp, paper rosters) with a structured, role-based system that improves visibility, communication, and operational efficiency.
+
+---
+
+## 🚀 Features
+
+### 👨‍💼 Manager Side
+- Create and manage weekly schedules  
+- Publish / Unpublish schedules  
+- Edit schedules in draft mode  
+- View total working hours per staff (hours & minutes format)  
+- Control visibility (only published schedules are visible to staff)  
+
+### 👩‍💻 Staff Side
+- View assigned shifts (published only)  
+- Submit leave requests  
+- Request shift swaps  
+- Track personal working hours  
+
+---
+
+## 💡 Problem Statement
+
+In many SMEs, staff scheduling is:
+- Manual (Excel / paper)
+- Unstructured
+- Prone to miscommunication
+
+This leads to:
+- Scheduling conflicts  
+- Confusion over latest updates  
+- Time wasted on coordination  
+
+**TanShift solves this by introducing a structured scheduling workflow with clear state control (Draft vs Published).**
+
+---
+
+## 🧩 Key System Logic
+
+### 🔁 Publish / Unpublish Workflow
+- `Draft` → editable by manager  
+- `Published` → visible to staff  
+- Unpublish resets schedule to draft mode  
+
+This ensures:
+- No accidental updates shown to staff  
+- Clear separation between planning and execution  
+
+---
+
+### ⏱ Time Calculation
+- All shift durations are calculated automatically  
+- Display format: `X hours Y mins`  
+
+---
+
+### 🔐 Role-Based Access Control
+- Manager: full control  
+- Staff: read-only (published schedules only)  
+
+---
+
+## 🛠️ Tech Stack
+
+- Frontend: Next.js / Angular  
+- Backend: Node.js / Supabase  
+- Database: PostgreSQL  
+- Authentication: Supabase Auth  
+- Hosting: Coming soon...  
+
+---
+
+## 🧪 Getting Started
+
+This is a Next.js project bootstrapped with `create-next-app`.
+
+### Install dependencies
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+npm install
