@@ -102,6 +102,25 @@ function calculateHours(start: string, end: string) {
   return Math.max((endTotal - startTotal) / 60, 0);
 }
 
+function parseLocalDateToMidnight(dateString: string) {
+  // Re-use parsing that matches how we format locally for schedule_weeks.
+  return parseLocalDate(dateString);
+}
+
+function getStaffDayOfWeek(dateString: string) {
+  // Staff availability uses 1=Mon ... 7=Sun.
+  const date = parseLocalDateToMidnight(dateString);
+  const jsDay = date.getDay(); // 0=Sun..6=Sat
+  return jsDay === 0 ? 7 : jsDay;
+}
+
+function isDateWithinWeek(weekStartDate: string, dateString: string) {
+  const weekStart = parseLocalDateToMidnight(weekStartDate);
+  const date = parseLocalDateToMidnight(dateString);
+  const diffDays = Math.floor((date.getTime() - weekStart.getTime()) / 86400000);
+  return diffDays >= 0 && diffDays <= 6;
+}
+
 export default function SchedulePage() {
   const [stores, setStores] = useState<Store[]>([]);
   const [staff, setStaff] = useState<StaffProfile[]>([]);
@@ -121,6 +140,7 @@ export default function SchedulePage() {
 
   const [availabilitySubmissions, setAvailabilitySubmissions] = useState<AvailabilitySubmission[]>([]);
   const [availabilitySlots, setAvailabilitySlots] = useState<AvailabilitySlot[]>([]);
+  const [availabilityLoading, setAvailabilityLoading] = useState(false);
 
   useEffect(() => {
     async function loadInitialData() {
@@ -157,22 +177,79 @@ export default function SchedulePage() {
     loadScheduleWeek(selectedStoreId, weekStartDate);
   }, [selectedStoreId, weekStartDate]);
 
+  useEffect(() => {
+    // Keep the "Shift Date" aligned with the selected schedule week.
+    // If the user changes the week, but the shift date is outside that week, reset it to Monday.
+    if (!weekStartDate) return;
+    if (!isDateWithinWeek(weekStartDate, shiftDate)) {
+      setShiftDate(weekStartDate);
+    }
+  }, [weekStartDate, shiftDate]);
+
+  useEffect(() => {
+    async function loadAvailabilityForWeek() {
+      if (!weekStartDate) return;
+
+      setAvailabilityLoading(true);
+      try {
+        const { data: submissionData, error: submissionError } = await supabase
+          .from("availability_submissions")
+          .select("id, staff_id, week_start_date")
+          .eq("week_start_date", weekStartDate)
+          .eq("status", "submitted");
+
+        if (submissionError) throw submissionError;
+
+        const submissions = (submissionData as AvailabilitySubmission[]) || [];
+        setAvailabilitySubmissions(submissions);
+
+        const submissionIds = submissions.map((s) => s.id);
+        if (submissionIds.length === 0) {
+          setAvailabilitySlots([]);
+          return;
+        }
+
+        const { data: slotData, error: slotError } = await supabase
+          .from("availability_slots")
+          .select("id, submission_id, day_of_week, start_time, end_time")
+          .in("submission_id", submissionIds)
+          .order("day_of_week", { ascending: true })
+          .order("start_time", { ascending: true });
+
+        if (slotError) throw slotError;
+        setAvailabilitySlots((slotData as AvailabilitySlot[]) || []);
+      } catch (err) {
+        console.error("Failed to load availability:", err);
+        setAvailabilitySubmissions([]);
+        setAvailabilitySlots([]);
+      } finally {
+        setAvailabilityLoading(false);
+      }
+    }
+
+    loadAvailabilityForWeek();
+  }, [weekStartDate]);
+
   async function loadScheduleWeek(storeId: string, weekDate: string) {
     setLoading(true);
 
-    let { data: existingWeek, error } = await supabase
+    const {
+      data: existingWeekData,
+      error: existingWeekError,
+    } = await supabase
       .from("schedule_weeks")
       .select("*")
       .eq("store_id", storeId)
       .eq("week_start_date", weekDate)
       .maybeSingle();
 
-    if (error) {
-      console.error("Failed to load schedule week:", error);
+    if (existingWeekError) {
+      console.error("Failed to load schedule week:", existingWeekError);
       setLoading(false);
       return;
     }
 
+    let existingWeek = existingWeekData;
     if (!existingWeek) {
       const { data: newWeek, error: createError } = await supabase
         .from("schedule_weeks")
@@ -224,6 +301,35 @@ export default function SchedulePage() {
     if (!assignedStaffId) {
       alert("Please select a staff member.");
       return;
+    }
+
+    if (!isDateWithinWeek(weekStartDate, shiftDate)) {
+      alert("Shift date must be within the selected week.");
+      return;
+    }
+
+    // Enforce staff availability when submitting a shift.
+    if (availabilityLoading) {
+      alert("Loading staff availability. Please try again in a moment.");
+      return;
+    }
+
+    if (!availabilityLoading) {
+      const staffDayOfWeek = getStaffDayOfWeek(shiftDate);
+
+      const matchingSlots = availabilitySlots.filter((slot) => {
+        const submission = availabilitySubmissions.find((s) => s.id === slot.submission_id);
+        if (!submission) return false;
+        if (submission.staff_id !== assignedStaffId) return false;
+        if (slot.day_of_week !== staffDayOfWeek) return false;
+        // Require the shift to fit within the submitted availability window.
+        return shiftStart >= slot.start_time && shiftEnd <= slot.end_time;
+      });
+
+      if (matchingSlots.length === 0) {
+        alert("Selected staff is not available for this day/time (based on submitted availability).");
+        return;
+      }
     }
 
     setSaving(true);
@@ -315,6 +421,67 @@ export default function SchedulePage() {
   const staffNameMap = useMemo(() => {
     return Object.fromEntries(staff.map((member) => [member.id, member.name]));
   }, [staff]);
+
+  const submissionIdToStaffId = useMemo(() => {
+    return Object.fromEntries(
+      availabilitySubmissions.map((s) => [s.id, s.staff_id])
+    ) as Record<string, string>;
+  }, [availabilitySubmissions]);
+
+  const availabilitySlotsByStaffId = useMemo(() => {
+    const map: Record<string, AvailabilitySlot[]> = {};
+    for (const slot of availabilitySlots) {
+      const staffId = submissionIdToStaffId[slot.submission_id];
+      if (!staffId) continue;
+      if (!map[staffId]) map[staffId] = [];
+      map[staffId].push(slot);
+    }
+    return map;
+  }, [availabilitySlots, submissionIdToStaffId]);
+
+  const selectedStaffDayOfWeek = useMemo(() => {
+    if (!shiftDate) return null;
+    return getStaffDayOfWeek(shiftDate);
+  }, [shiftDate]);
+
+  const isStaffAvailableForSelectedShift = useMemo(() => {
+    // Map staff_id -> available boolean for current day/time selection.
+    const dayOfWeek = selectedStaffDayOfWeek;
+    const start = shiftStart;
+    const end = shiftEnd;
+
+    const map: Record<string, boolean> = {};
+    for (const member of filteredStaff) {
+      if (!dayOfWeek) {
+        map[member.id] = false;
+        continue;
+      }
+
+      const staffSlots = availabilitySlotsByStaffId[member.id] || [];
+      const isAvailable = staffSlots.some((slot) => {
+        if (slot.day_of_week !== dayOfWeek) return false;
+        return start >= slot.start_time && end <= slot.end_time;
+      });
+      map[member.id] = isAvailable;
+    }
+    return map;
+  }, [filteredStaff, availabilitySlotsByStaffId, selectedStaffDayOfWeek, shiftStart, shiftEnd]);
+
+  const availableStaffCount = useMemo(() => {
+    return filteredStaff.reduce((acc, member) => acc + (isStaffAvailableForSelectedShift[member.id] ? 1 : 0), 0);
+  }, [filteredStaff, isStaffAvailableForSelectedShift]);
+
+  const isAssignedStaffAvailable = useMemo(() => {
+    if (!assignedStaffId) return false;
+    return !!isStaffAvailableForSelectedShift[assignedStaffId];
+  }, [assignedStaffId, isStaffAvailableForSelectedShift]);
+
+  useEffect(() => {
+    // If the currently selected staff becomes unavailable due to date/time changes, clear the selection.
+    if (!assignedStaffId) return;
+    if (availabilityLoading) return;
+    if (!isAssignedStaffAvailable) setAssignedStaffId("");
+  }, [assignedStaffId, isAssignedStaffAvailable, availabilityLoading]);
 
   const weeklyHours = useMemo(() => {
     const totals: Record<string, number> = {};
@@ -426,11 +593,23 @@ export default function SchedulePage() {
                 >
                   <option value="">Select staff</option>
                   {filteredStaff.map((member) => (
-                    <option key={member.id} value={member.id}>
+                    <option
+                      key={member.id}
+                      value={member.id}
+                      disabled={!availabilityLoading && !isStaffAvailableForSelectedShift[member.id]}
+                    >
                       {member.name} · {member.skill_level}
+                      {!availabilityLoading && !isStaffAvailableForSelectedShift[member.id]
+                        ? " (Unavailable)"
+                        : ""}
                     </option>
                   ))}
                 </select>
+                <p className="mt-2 text-xs text-slate-500">
+                  {availabilityLoading
+                    ? "Loading availability..."
+                    : `Available for this day/time: ${availableStaffCount}/${filteredStaff.length}`}
+                </p>
               </div>
 
               <div className="grid gap-3 md:grid-cols-2">

@@ -27,11 +27,21 @@ const DAYS = [
 
 function getNextMondayDate() {
   const today = new Date();
-  const day = today.getDay(); // Sunday = 0
+  const localToday = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate()
+  );
+  const day = localToday.getDay(); // Sunday = 0
   const diff = day === 0 ? 1 : 8 - day;
-  const nextMonday = new Date(today);
-  nextMonday.setDate(today.getDate() + diff);
-  return nextMonday.toISOString().split("T")[0];
+
+  const nextMonday = new Date(localToday);
+  nextMonday.setDate(localToday.getDate() + diff);
+
+  const year = nextMonday.getFullYear();
+  const month = String(nextMonday.getMonth() + 1).padStart(2, "0");
+  const dayOfMonth = String(nextMonday.getDate()).padStart(2, "0");
+  return `${year}-${month}-${dayOfMonth}`;
 }
 
 export default function StaffAvailabilityPage() {
