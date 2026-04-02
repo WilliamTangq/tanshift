@@ -89,7 +89,7 @@ This ensures:
 
 ## 📸 Screenshots
 
-> Add screenshots here (recommended)
+> will be adding ...
 - Manager Dashboard  
 - Staff Schedule View  
 - Leave Request UI  
