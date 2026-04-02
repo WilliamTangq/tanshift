@@ -16,10 +16,7 @@ type ShiftRow = {
   assigned_staff_id: string | null;
   shift_start: string;
   shift_end: string;
-  schedule_weeks?: {
-    status: "draft" | "published";
-    week_start_date: string;
-  }[];
+  schedule_week_id: string;
 };
 
 type RequestRow = {
@@ -71,32 +68,42 @@ export default function StaffRequestsPage() {
         return;
       }
 
-      const { data: shiftData, error: shiftError } = await supabase
-        .from("scheduled_shifts")
-        .select(`
-          id,
-          shift_date,
-          department,
-          assigned_staff_id,
-          shift_start,
-          shift_end,
-          schedule_weeks (
-            status,
-            week_start_date
-          )
-        `)
-        .eq("assigned_staff_id", selectedStaffId)
-        .order("shift_date", { ascending: true });
+      const { data: publishedWeeks, error: publishedWeeksError } = await supabase
+        .from("schedule_weeks")
+        .select("id")
+        .eq("status", "published");
 
-      if (shiftError) {
-        console.error("Failed to load shifts:", shiftError);
+      if (publishedWeeksError) {
+        console.error("Failed to load published schedule weeks:", publishedWeeksError);
         setPublishedShifts([]);
       } else {
-        const typedShifts = ((shiftData as unknown as ShiftRow[]) || []);
-        const publishedOnly = typedShifts.filter(
-          (shift) => shift.schedule_weeks?.[0]?.status === "published"
-        );
-      setPublishedShifts(publishedOnly);
+        const publishedWeekIds = (publishedWeeks || []).map((week) => week.id);
+
+        if (publishedWeekIds.length === 0) {
+          setPublishedShifts([]);
+        } else {
+          const { data: shiftData, error: shiftError } = await supabase
+            .from("scheduled_shifts")
+            .select(`
+              id,
+              shift_date,
+              department,
+              assigned_staff_id,
+              shift_start,
+              shift_end,
+              schedule_week_id
+            `)
+            .eq("assigned_staff_id", selectedStaffId)
+            .in("schedule_week_id", publishedWeekIds)
+            .order("shift_date", { ascending: true });
+
+          if (shiftError) {
+            console.error("Failed to load shifts:", shiftError);
+            setPublishedShifts([]);
+          } else {
+            setPublishedShifts((shiftData as ShiftRow[]) || []);
+          }
+        }
       }
 
       const { data: requestData, error: requestError } = await supabase
