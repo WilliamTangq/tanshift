@@ -109,8 +109,7 @@ export default function ManagerAvailabilityPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6">
-      <div className="mx-auto max-w-6xl">
+    <div className="mx-auto max-w-6xl">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Staff Availability</h1>
@@ -214,7 +213,6 @@ export default function ManagerAvailabilityPage() {
             </div>
           )}
         </div>
-      </div>
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { useSession } from "@/lib/session-context";
 
 type StaffProfile = {
   id: string;
@@ -45,8 +46,8 @@ function getNextMondayDate() {
 }
 
 export default function StaffAvailabilityPage() {
-  const [staffList, setStaffList] = useState<StaffProfile[]>([]);
-  const [selectedStaffId, setSelectedStaffId] = useState("");
+  const { staffProfileId, staffName } = useSession();
+  const [profile, setProfile] = useState<StaffProfile | null>(null);
   const [weekStartDate, setWeekStartDate] = useState(getNextMondayDate());
   const [note, setNote] = useState("");
   const [slots, setSlots] = useState<Slot[]>([
@@ -55,27 +56,32 @@ export default function StaffAvailabilityPage() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    async function loadStaff() {
+    if (!staffProfileId) return;
+
+    async function loadProfile() {
       const { data, error } = await supabase
         .from("staff_profiles")
         .select("id, name, department")
-        .eq("active", true)
-        .order("name", { ascending: true });
+        .eq("id", staffProfileId)
+        .maybeSingle();
 
       if (error) {
-        console.error("Failed to load staff:", error);
+        console.error("Failed to load profile:", error);
       } else {
-        setStaffList((data as StaffProfile[]) || []);
+        setProfile((data as StaffProfile) || null);
       }
     }
 
-    loadStaff();
-  }, []);
+    loadProfile();
+  }, [staffProfileId]);
 
-  const selectedStaff = useMemo(
-    () => staffList.find((s) => s.id === selectedStaffId),
-    [staffList, selectedStaffId]
-  );
+  const selectedStaff = useMemo(() => {
+    if (profile) return profile;
+    if (staffProfileId && staffName) {
+      return { id: staffProfileId, name: staffName, department: "front" as const };
+    }
+    return undefined;
+  }, [profile, staffProfileId, staffName]);
 
   function updateSlot(index: number, field: keyof Slot, value: string | number) {
     setSlots((prev) =>
@@ -99,8 +105,8 @@ export default function StaffAvailabilityPage() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
 
-    if (!selectedStaffId) {
-      alert("Please select a staff member.");
+    if (!staffProfileId) {
+      alert("Missing staff session.");
       return;
     }
 
@@ -114,7 +120,7 @@ export default function StaffAvailabilityPage() {
     const { data: submissionData, error: submissionError } = await supabase
       .from("availability_submissions")
       .insert({
-        staff_id: selectedStaffId,
+        staff_id: staffProfileId,
         week_start_date: weekStartDate,
         note,
         status: "submitted",
@@ -152,40 +158,20 @@ export default function StaffAvailabilityPage() {
 
     alert("Availability submitted successfully.");
 
-    setSelectedStaffId("");
     setNote("");
     setSlots([{ day_of_week: 1, start_time: "10:00", end_time: "21:30" }]);
     setSaving(false);
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6">
-      <div className="mx-auto max-w-4xl">
-        <h1 className="text-2xl font-bold text-slate-900">Submit Availability</h1>
+    <div className="mx-auto max-w-4xl">
+        <h1 className="text-2xl font-bold text-slate-900">Submit availability</h1>
         <p className="mt-2 text-sm text-slate-600">
-          Submit next week&apos;s availability for a staff member.
+          Submit next week&apos;s availability for yourself.
         </p>
 
         <div className="mt-8 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
-                Staff Member
-              </label>
-              <select
-                value={selectedStaffId}
-                onChange={(e) => setSelectedStaffId(e.target.value)}
-                className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-500"
-              >
-                <option value="">Select staff</option>
-                {staffList.map((staff) => (
-                  <option key={staff.id} value={staff.id}>
-                    {staff.name} ({staff.department})
-                  </option>
-                ))}
-              </select>
-            </div>
-
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">
                 Week Start Date (Monday)
@@ -276,7 +262,9 @@ export default function StaffAvailabilityPage() {
 
             {selectedStaff && (
               <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
-                Submitting for: <span className="font-semibold">{selectedStaff.name}</span>
+                Submitting as:{" "}
+                <span className="font-semibold">{selectedStaff.name}</span> (
+                {selectedStaff.department})
               </div>
             )}
 
@@ -289,7 +277,6 @@ export default function StaffAvailabilityPage() {
             </button>
           </form>
         </div>
-      </div>
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { useSession } from "@/lib/session-context";
 
 type StaffProfile = {
   id: string;
@@ -75,8 +76,8 @@ function calculateHours(start: string, end: string) {
 }
 
 export default function StaffSchedulePage() {
-  const [staffList, setStaffList] = useState<StaffProfile[]>([]);
-  const [selectedStaffId, setSelectedStaffId] = useState("");
+  const { staffProfileId, staffName } = useSession();
+  const [profile, setProfile] = useState<StaffProfile | null>(null);
   const [weekStartDate, setWeekStartDate] = useState(getNextMondayDate());
   const [shifts, setShifts] = useState<ShiftRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,28 +85,30 @@ export default function StaffSchedulePage() {
   const pollTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
-    async function loadStaff() {
+    if (!staffProfileId) return;
+
+    async function loadProfile() {
       const { data, error } = await supabase
         .from("staff_profiles")
         .select("id, name, department, skill_level")
-        .eq("active", true)
-        .order("name", { ascending: true });
+        .eq("id", staffProfileId)
+        .maybeSingle();
 
       if (error) {
-        console.error("Failed to load staff:", error);
+        console.error("Failed to load profile:", error);
       } else {
-        setStaffList((data as StaffProfile[]) || []);
+        setProfile((data as StaffProfile) || null);
       }
     }
 
-    loadStaff();
-  }, []);
+    loadProfile();
+  }, [staffProfileId]);
 
   useEffect(() => {
     let cancelled = false;
 
     async function fetchSchedule({ showLoading }: { showLoading: boolean }) {
-      if (!selectedStaffId || !weekStartDate) {
+      if (!staffProfileId || !weekStartDate) {
         if (cancelled) return;
         setShifts([]);
         setInfoMessage("");
@@ -142,7 +145,7 @@ export default function StaffSchedulePage() {
         .from("scheduled_shifts")
         .select("*")
         .eq("schedule_week_id", weekData.id)
-        .eq("assigned_staff_id", selectedStaffId)
+        .eq("assigned_staff_id", staffProfileId)
         .order("shift_date", { ascending: true })
         .order("shift_start", { ascending: true });
 
@@ -178,7 +181,7 @@ export default function StaffSchedulePage() {
         pollTimerRef.current = null;
       }
     };
-  }, [selectedStaffId, weekStartDate]);
+  }, [staffProfileId, weekStartDate]);
 
   const groupedByDay = useMemo(() => {
     const result: Record<string, ShiftRow[]> = {};
@@ -198,50 +201,38 @@ export default function StaffSchedulePage() {
   }, [shifts]);
 
   const selectedStaff = useMemo(() => {
-    return staffList.find((staff) => staff.id === selectedStaffId) || null;
-  }, [staffList, selectedStaffId]);
+    if (profile) return profile;
+    if (staffProfileId && staffName) {
+      return {
+        id: staffProfileId,
+        name: staffName,
+        department: "front" as const,
+        skill_level: "normal" as const,
+      };
+    }
+    return null;
+  }, [profile, staffProfileId, staffName]);
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6">
-      <div className="mx-auto max-w-6xl">
+    <div className="mx-auto max-w-6xl">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">My Schedule</h1>
+            <h1 className="text-2xl font-bold text-slate-900">My schedule</h1>
             <p className="mt-2 text-sm text-slate-600">
               View your shifts for the selected week.
             </p>
           </div>
 
-          <div className="grid gap-3 md:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
-                Staff Member
-              </label>
-              <select
-                value={selectedStaffId}
-                onChange={(e) => setSelectedStaffId(e.target.value)}
-                className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-slate-500"
-              >
-                <option value="">Select staff</option>
-                {staffList.map((staff) => (
-                  <option key={staff.id} value={staff.id}>
-                    {staff.name} · {staff.department}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
-                Week Start Date
-              </label>
-              <input
-                type="date"
-                value={weekStartDate}
-                onChange={(e) => setWeekStartDate(e.target.value)}
-                className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-slate-500"
-              />
-            </div>
+          <div className="w-full max-w-xs">
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              Week start (Monday)
+            </label>
+            <input
+              type="date"
+              value={weekStartDate}
+              onChange={(e) => setWeekStartDate(e.target.value)}
+              className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-slate-500"
+            />
           </div>
         </div>
 
@@ -267,10 +258,8 @@ export default function StaffSchedulePage() {
         <div className="mt-8 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
           {loading ? (
             <p className="text-sm text-slate-600">Loading schedule...</p>
-          ) : !selectedStaffId ? (
-            <p className="text-sm text-slate-600">
-              Select a staff member to view schedule.
-            </p>
+          ) : !staffProfileId ? (
+            <p className="text-sm text-slate-600">Missing staff session.</p>
           ) : infoMessage ? (
             <p className="text-sm text-slate-600">{infoMessage}</p>
           ) : (
@@ -317,7 +306,6 @@ export default function StaffSchedulePage() {
             </div>
           )}
         </div>
-      </div>
     </div>
   );
 }

@@ -1,8 +1,12 @@
 import type { Metadata } from "next";
+import { Providers } from "@/components/providers";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "TanShift",
+  title: {
+    default: "TanShift",
+    template: "%s · TanShift",
+  },
   description: "Mobile-first staff scheduling for small business teams.",
 };
 
@@ -13,7 +17,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body className="antialiased">
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }
