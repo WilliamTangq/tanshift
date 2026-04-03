@@ -13,6 +13,7 @@ type ShiftRow = {
   id: string;
   shift_date: string;
   department: "front" | "kitchen";
+  assigned_staff_id: string | null;
   shift_start: string;
   shift_end: string;
 };
@@ -20,6 +21,7 @@ type ShiftRow = {
 type RequestRow = {
   id: string;
   shift_id: string;
+  counter_shift_id: string | null;
   request_type: "leave" | "swap";
   from_staff_id: string;
   to_staff_id: string | null;
@@ -63,7 +65,7 @@ export default function ManagerRequestsPage() {
 
     const { data: shiftData, error: shiftError } = await supabase
       .from("scheduled_shifts")
-      .select("id, shift_date, department, shift_start, shift_end")
+      .select("id, shift_date, department, assigned_staff_id, shift_start, shift_end")
       .order("shift_date", { ascending: true });
 
     if (shiftError) {
@@ -79,6 +81,98 @@ export default function ManagerRequestsPage() {
     loadData();
   }, []);
 
+  async function applyApprovedSwap(request: RequestRow): Promise<boolean> {
+    if (!request.to_staff_id) {
+      alert("This swap request is missing a partner.");
+      return false;
+    }
+
+    const { data: shiftFrom, error: fromErr } = await supabase
+      .from("scheduled_shifts")
+      .select("*")
+      .eq("id", request.shift_id)
+      .single();
+
+    if (fromErr || !shiftFrom) {
+      console.error("Failed to load request shift:", fromErr);
+      alert("Could not load the scheduled shift for this request.");
+      return false;
+    }
+
+    let counterId = request.counter_shift_id;
+    if (!counterId) {
+      const { data: auto } = await supabase
+        .from("scheduled_shifts")
+        .select("id")
+        .eq("schedule_week_id", shiftFrom.schedule_week_id)
+        .eq("assigned_staff_id", request.to_staff_id)
+        .neq("id", request.shift_id)
+        .order("shift_date", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      counterId = auto?.id ?? null;
+    }
+
+    if (!counterId) {
+      alert(
+        "Cannot approve: no partner shift is linked. Ask staff to resubmit with both shifts, or add the partner shift to the schedule first."
+      );
+      return false;
+    }
+
+    const { data: shiftCounter, error: counterErr } = await supabase
+      .from("scheduled_shifts")
+      .select("*")
+      .eq("id", counterId)
+      .single();
+
+    if (counterErr || !shiftCounter) {
+      console.error("Failed to load counter shift:", counterErr);
+      alert("Could not load the partner shift for this swap.");
+      return false;
+    }
+
+    if (shiftFrom.id === shiftCounter.id) {
+      alert("Invalid swap: both sides refer to the same shift.");
+      return false;
+    }
+
+    if (shiftFrom.assigned_staff_id !== request.from_staff_id) {
+      alert(
+        "Cannot approve: the shift is no longer assigned to the person who requested the swap."
+      );
+      return false;
+    }
+
+    if (shiftCounter.assigned_staff_id !== request.to_staff_id) {
+      alert(
+        "Cannot approve: the partner shift is no longer assigned to the swap partner."
+      );
+      return false;
+    }
+
+    const { error: errA } = await supabase
+      .from("scheduled_shifts")
+      .update({ assigned_staff_id: request.to_staff_id })
+      .eq("id", shiftFrom.id);
+
+    const { error: errB } = await supabase
+      .from("scheduled_shifts")
+      .update({ assigned_staff_id: request.from_staff_id })
+      .eq("id", shiftCounter.id);
+
+    if (errA || errB) {
+      console.error("Failed to apply swap:", errA, errB);
+      alert(
+        `Failed to update the schedule: ${errA?.message || errB?.message || "Unknown error"}`
+      );
+      return false;
+    }
+
+    return true;
+  }
+
   async function handleUpdateStatus(
     requestId: string,
     newStatus: "approved" | "rejected"
@@ -87,6 +181,17 @@ export default function ManagerRequestsPage() {
       `Are you sure you want to mark this request as ${newStatus}?`
     );
     if (!confirmed) return;
+
+    const request = requests.find((r) => r.id === requestId);
+    if (!request) {
+      alert("Request not found.");
+      return;
+    }
+
+    if (newStatus === "approved" && request.request_type === "swap") {
+      const ok = await applyApprovedSwap(request);
+      if (!ok) return;
+    }
 
     const { error } = await supabase
       .from("time_off_requests")
@@ -125,7 +230,11 @@ export default function ManagerRequestsPage() {
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Requests</h1>
             <p className="mt-2 text-sm text-slate-600">
-              Review and manage leave and swap requests from staff.
+              Approve or reject swap requests. Approving applies the swap to the published schedule — open{" "}
+              <a href="/manager/schedule" className="font-medium text-slate-800 underline">
+                Schedule
+              </a>{" "}
+              to review the week.
             </p>
           </div>
 
@@ -163,6 +272,9 @@ export default function ManagerRequestsPage() {
                   ? staffNameMap[request.to_staff_id]
                   : null;
                 const shift = shiftMap[request.shift_id];
+                const counterShift = request.counter_shift_id
+                  ? shiftMap[request.counter_shift_id]
+                  : null;
 
                 return (
                   <div
@@ -173,7 +285,7 @@ export default function ManagerRequestsPage() {
                       <div>
                         <h2 className="text-lg font-semibold text-slate-900">
                           {request.request_type === "leave"
-                            ? "Leave Request"
+                            ? "Leave Request (legacy)"
                             : "Swap Request"}
                         </h2>
                         <p className="mt-1 text-sm text-slate-600">
@@ -189,8 +301,15 @@ export default function ManagerRequestsPage() {
 
                         {shift && (
                           <p className="text-sm text-slate-600">
-                            Shift: {shift.shift_date} · {shift.department} ·{" "}
+                            Requester shift: {shift.shift_date} · {shift.department} ·{" "}
                             {shift.shift_start} - {shift.shift_end}
+                          </p>
+                        )}
+
+                        {counterShift && (
+                          <p className="text-sm text-slate-600">
+                            Partner shift: {counterShift.shift_date} · {counterShift.department}{" "}
+                            · {counterShift.shift_start} - {counterShift.shift_end}
                           </p>
                         )}
 

@@ -26,6 +26,7 @@ type RequestRow = {
   status: "pending" | "approved" | "rejected";
   created_at: string;
   shift_id: string;
+  counter_shift_id: string | null;
   from_staff_id: string;
   to_staff_id: string | null;
 };
@@ -37,8 +38,9 @@ export default function StaffRequestsPage() {
   const [requests, setRequests] = useState<RequestRow[]>([]);
 
   const [selectedShiftId, setSelectedShiftId] = useState("");
-  const [requestType, setRequestType] = useState<"leave" | "swap">("leave");
   const [toStaffId, setToStaffId] = useState("");
+  const [counterShiftId, setCounterShiftId] = useState("");
+  const [partnerShifts, setPartnerShifts] = useState<ShiftRow[]>([]);
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -123,6 +125,54 @@ export default function StaffRequestsPage() {
     loadStaffData();
   }, [selectedStaffId]);
 
+  useEffect(() => {
+    async function loadPartnerShifts() {
+      if (!selectedShiftId || !toStaffId) {
+        setPartnerShifts([]);
+        setCounterShiftId("");
+        return;
+      }
+
+      const weekRow = publishedShifts.find((s) => s.id === selectedShiftId);
+      if (!weekRow) {
+        setPartnerShifts([]);
+        setCounterShiftId("");
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("scheduled_shifts")
+        .select(`
+          id,
+          shift_date,
+          department,
+          assigned_staff_id,
+          shift_start,
+          shift_end,
+          schedule_week_id
+        `)
+        .eq("schedule_week_id", weekRow.schedule_week_id)
+        .eq("assigned_staff_id", toStaffId)
+        .order("shift_date", { ascending: true });
+
+      if (error) {
+        console.error("Failed to load partner shifts:", error);
+        setPartnerShifts([]);
+        setCounterShiftId("");
+        return;
+      }
+
+      const list = (data as ShiftRow[]) || [];
+      setPartnerShifts(list);
+      setCounterShiftId((prev) => {
+        if (prev && list.some((s) => s.id === prev)) return prev;
+        return list[0]?.id ?? "";
+      });
+    }
+
+    loadPartnerShifts();
+  }, [selectedShiftId, toStaffId, publishedShifts]);
+
   const selectedShift = useMemo(
     () => publishedShifts.find((shift) => shift.id === selectedShiftId) || null,
     [publishedShifts, selectedShiftId]
@@ -141,8 +191,20 @@ export default function StaffRequestsPage() {
       return;
     }
 
-    if (requestType === "swap" && !toStaffId) {
+    if (!toStaffId) {
       alert("Please choose who you want to swap with.");
+      return;
+    }
+
+    if (!counterShiftId) {
+      alert(
+        "Your swap partner has no shift in this published week, or you need to pick their shift to trade."
+      );
+      return;
+    }
+
+    if (counterShiftId === selectedShiftId) {
+      alert("Pick two different shifts to swap.");
       return;
     }
 
@@ -150,9 +212,10 @@ export default function StaffRequestsPage() {
 
     const { error } = await supabase.from("time_off_requests").insert({
       shift_id: selectedShiftId,
-      request_type: requestType,
+      counter_shift_id: counterShiftId,
+      request_type: "swap",
       from_staff_id: selectedStaffId,
-      to_staff_id: requestType === "swap" ? toStaffId : null,
+      to_staff_id: toStaffId,
       reason: reason.trim() || null,
       status: "pending",
     });
@@ -163,8 +226,8 @@ export default function StaffRequestsPage() {
     } else {
       alert("Request submitted successfully.");
       setSelectedShiftId("");
-      setRequestType("leave");
       setToStaffId("");
+      setCounterShiftId("");
       setReason("");
 
       const { data: requestData } = await supabase
@@ -184,7 +247,14 @@ export default function StaffRequestsPage() {
       <div className="mx-auto max-w-6xl">
         <h1 className="text-2xl font-bold text-slate-900">My Requests</h1>
         <p className="mt-2 text-sm text-slate-600">
-          Submit leave or swap requests for published shifts.
+          Request a swap between your shift and a colleague&apos;s shift on the published schedule.
+        </p>
+        <p className="mt-1 text-sm text-slate-500">
+          After a manager approves, the schedule updates. Check{" "}
+          <a href="/staff/schedule" className="font-medium text-slate-800 underline">
+            My Schedule
+          </a>{" "}
+          for the week.
         </p>
 
         <div className="mt-8 grid gap-6 lg:grid-cols-[420px_minmax(0,1fr)]">
@@ -202,6 +272,7 @@ export default function StaffRequestsPage() {
                     setSelectedStaffId(e.target.value);
                     setSelectedShiftId("");
                     setToStaffId("");
+                    setCounterShiftId("");
                   }}
                   className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-500"
                 >
@@ -220,7 +291,10 @@ export default function StaffRequestsPage() {
                 </label>
                 <select
                   value={selectedShiftId}
-                  onChange={(e) => setSelectedShiftId(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedShiftId(e.target.value);
+                    setCounterShiftId("");
+                  }}
                   className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-500"
                 >
                   <option value="">Select shift</option>
@@ -234,36 +308,47 @@ export default function StaffRequestsPage() {
 
               <div>
                 <label className="mb-1 block text-sm font-medium text-slate-700">
-                  Request Type
+                  Swap With
                 </label>
                 <select
-                  value={requestType}
-                  onChange={(e) => setRequestType(e.target.value as "leave" | "swap")}
+                  value={toStaffId}
+                  onChange={(e) => {
+                    setToStaffId(e.target.value);
+                    setCounterShiftId("");
+                  }}
                   className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-500"
                 >
-                  <option value="leave">Leave</option>
-                  <option value="swap">Swap</option>
+                  <option value="">Select staff</option>
+                  {staffList
+                    .filter((staff) => staff.id !== selectedStaffId)
+                    .map((staff) => (
+                      <option key={staff.id} value={staff.id}>
+                        {staff.name} · {staff.department}
+                      </option>
+                    ))}
                 </select>
               </div>
 
-              {requestType === "swap" && (
+              {toStaffId && (
                 <div>
                   <label className="mb-1 block text-sm font-medium text-slate-700">
-                    Swap With
+                    Their shift to trade (same week)
                   </label>
                   <select
-                    value={toStaffId}
-                    onChange={(e) => setToStaffId(e.target.value)}
+                    value={counterShiftId}
+                    onChange={(e) => setCounterShiftId(e.target.value)}
                     className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-500"
                   >
-                    <option value="">Select staff</option>
-                    {staffList
-                      .filter((staff) => staff.id !== selectedStaffId)
-                      .map((staff) => (
-                        <option key={staff.id} value={staff.id}>
-                          {staff.name} · {staff.department}
-                        </option>
-                      ))}
+                    <option value="">
+                      {partnerShifts.length === 0
+                        ? "No published shifts for this person this week"
+                        : "Select their shift"}
+                    </option>
+                    {partnerShifts.map((shift) => (
+                      <option key={shift.id} value={shift.id}>
+                        {shift.shift_date} · {shift.department} · {shift.shift_start} - {shift.shift_end}
+                      </option>
+                    ))}
                   </select>
                 </div>
               )}
@@ -320,7 +405,9 @@ export default function StaffRequestsPage() {
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
                         <p className="font-medium text-slate-900">
-                          {request.request_type === "leave" ? "Leave Request" : "Swap Request"}
+                          {request.request_type === "leave"
+                            ? "Leave Request (legacy)"
+                            : "Swap Request"}
                         </p>
                         <p className="text-sm text-slate-500">
                           Submitted: {new Date(request.created_at).toLocaleString()}

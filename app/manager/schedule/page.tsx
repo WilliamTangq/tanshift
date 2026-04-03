@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
 type Store = {
@@ -141,6 +141,7 @@ export default function SchedulePage() {
   const [availabilitySubmissions, setAvailabilitySubmissions] = useState<AvailabilitySubmission[]>([]);
   const [availabilitySlots, setAvailabilitySlots] = useState<AvailabilitySlot[]>([]);
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
+  const schedulePollRef = useRef<number | null>(null);
 
   useEffect(() => {
     async function loadInitialData() {
@@ -174,7 +175,28 @@ export default function SchedulePage() {
 
   useEffect(() => {
     if (!selectedStoreId || !weekStartDate) return;
+
+    let cancelled = false;
+
     loadScheduleWeek(selectedStoreId, weekStartDate);
+
+    if (schedulePollRef.current) {
+      window.clearInterval(schedulePollRef.current);
+      schedulePollRef.current = null;
+    }
+    schedulePollRef.current = window.setInterval(() => {
+      if (!cancelled) {
+        loadScheduleWeek(selectedStoreId, weekStartDate, { silent: true });
+      }
+    }, 10000);
+
+    return () => {
+      cancelled = true;
+      if (schedulePollRef.current) {
+        window.clearInterval(schedulePollRef.current);
+        schedulePollRef.current = null;
+      }
+    };
   }, [selectedStoreId, weekStartDate]);
 
   useEffect(() => {
@@ -230,8 +252,13 @@ export default function SchedulePage() {
     loadAvailabilityForWeek();
   }, [weekStartDate]);
 
-  async function loadScheduleWeek(storeId: string, weekDate: string) {
-    setLoading(true);
+  async function loadScheduleWeek(
+    storeId: string,
+    weekDate: string,
+    options?: { silent?: boolean }
+  ) {
+    const silent = options?.silent === true;
+    if (!silent) setLoading(true);
 
     const {
       data: existingWeekData,
@@ -245,7 +272,7 @@ export default function SchedulePage() {
 
     if (existingWeekError) {
       console.error("Failed to load schedule week:", existingWeekError);
-      setLoading(false);
+      if (!silent) setLoading(false);
       return;
     }
 
@@ -263,7 +290,7 @@ export default function SchedulePage() {
 
       if (createError) {
         console.error("Failed to create schedule week:", createError);
-        setLoading(false);
+        if (!silent) setLoading(false);
         return;
       }
 
@@ -286,8 +313,10 @@ export default function SchedulePage() {
       setShifts((shiftData as ShiftRow[]) || []);
     }
 
-    setShiftDate(weekDate);
-    setLoading(false);
+    if (!silent) {
+      setShiftDate(weekDate);
+      setLoading(false);
+    }
   }
 
   async function handleAddShift(e: FormEvent) {
