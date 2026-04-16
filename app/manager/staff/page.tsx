@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { Badge, Button, Card, FieldLabel, Input, PageContainer, PageHeader, Select } from "@/components/ui-system";
 
 type Store = {
   id: string;
@@ -105,38 +106,31 @@ export default function StaffManagementPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl">
-        <h1 className="text-2xl font-bold text-slate-900">Staff Management</h1>
-        <p className="mt-2 text-sm text-slate-600">
-          Add staff members for TanShift and manage your team list.
-        </p>
+    <PageContainer>
+        <PageHeader
+          title="Staff Management"
+          description="Add staff members and maintain department, skill, and priority attributes."
+        />
 
-        <div className="mt-8 grid gap-6 lg:grid-cols-[380px_minmax(0,1fr)]">
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="text-lg font-semibold text-slate-900">Add Staff</h2>
+        <div className="grid gap-6 lg:grid-cols-[380px_minmax(0,1fr)]">
+          <Card title="Add Staff" subtitle="Create new active team profiles.">
 
             <form onSubmit={handleSubmit} className="mt-4 space-y-4">
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">
-                  Name
-                </label>
-                <input
+                <FieldLabel>Name</FieldLabel>
+                <Input
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Enter staff name"
-                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-slate-500"
                 />
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">
-                  Store
-                </label>
-                <select
+                <FieldLabel>Store</FieldLabel>
+                <Select
                   value={storeId}
                   onChange={(e) => setStoreId(e.target.value)}
-                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-slate-500"
                 >
                   <option value="">Select a store</option>
                   {stores.map((store) => (
@@ -144,72 +138,61 @@ export default function StaffManagementPage() {
                       {store.name}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">
-                  Department
-                </label>
-                <select
+                <FieldLabel>Department</FieldLabel>
+                <Select
                   value={department}
                   onChange={(e) => setDepartment(e.target.value as "front" | "kitchen")}
-                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-slate-500"
                 >
                   <option value="front">Front</option>
                   <option value="kitchen">Kitchen</option>
-                </select>
+                </Select>
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">
-                  Skill Level
-                </label>
-                <select
+                <FieldLabel>Skill Level</FieldLabel>
+                <Select
                   value={skillLevel}
                   onChange={(e) =>
                     setSkillLevel(e.target.value as "all_rounder" | "normal")
                   }
-                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-slate-500"
                 >
                   <option value="normal">Normal</option>
                   <option value="all_rounder">All-Rounder</option>
-                </select>
+                </Select>
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">
-                  Priority Level
-                </label>
-                <select
+                <FieldLabel>Priority Level</FieldLabel>
+                <Select
                   value={priorityLevel}
                   onChange={(e) =>
                     setPriorityLevel(e.target.value as "high" | "medium" | "low")
                   }
-                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-slate-500"
                 >
                   <option value="high">High</option>
                   <option value="medium">Medium</option>
                   <option value="low">Low</option>
-                </select>
+                </Select>
               </div>
 
-              <button
+              <Button
                 type="submit"
                 disabled={saving}
-                className="w-full rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                className="w-full"
               >
                 {saving ? "Saving..." : "Add Staff"}
-              </button>
+              </Button>
             </form>
-          </div>
+          </Card>
 
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+          <Card>
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-slate-900">Team Members</h2>
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
-                {staff.length} staff
-              </span>
+              <Badge>{staff.length} staff</Badge>
             </div>
 
             {loading ? (
@@ -241,23 +224,17 @@ export default function StaffManagementPage() {
                     {staff.map((member) => (
                       <tr key={member.id}>
                         <td className="px-4 py-3 text-slate-900">{member.name}</td>
-                        <td className="px-4 py-3 text-slate-600">
-                          {member.department}
-                        </td>
-                        <td className="px-4 py-3 text-slate-600">
-                          {member.skill_level}
-                        </td>
-                        <td className="px-4 py-3 text-slate-600">
-                          {member.priority_level}
-                        </td>
+                        <td className="px-4 py-3 text-slate-600">{member.department}</td>
+                        <td className="px-4 py-3 text-slate-600">{member.skill_level}</td>
+                        <td className="px-4 py-3 text-slate-600">{member.priority_level}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
             )}
-          </div>
+          </Card>
         </div>
-    </div>
+    </PageContainer>
   );
 }

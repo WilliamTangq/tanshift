@@ -2,6 +2,18 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  FieldLabel,
+  Input,
+  PageContainer,
+  PageHeader,
+  Select,
+  StatCard,
+} from "@/components/ui-system";
 
 type Store = {
   id: string;
@@ -507,103 +519,85 @@ export default function SchedulePage() {
   }, [shifts, weekStartDate]);
 
   return (
-    <div className="mx-auto max-w-7xl">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Schedule</h1>
-            <p className="mt-2 text-sm text-slate-600">
-              Build weekly shifts for front and kitchen teams.
-            </p>
-          </div>
+    <PageContainer>
+        <PageHeader title="Schedule Builder" description="Plan the week with availability-aware assignment and live hour totals." />
 
+        <Card>
           <div className="grid gap-3 md:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
-                Store
-              </label>
-              <select
+              <FieldLabel>Store</FieldLabel>
+              <Select
                 value={selectedStoreId}
                 onChange={(e) => setSelectedStoreId(e.target.value)}
-                className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-slate-500"
               >
                 {stores.map((store) => (
                   <option key={store.id} value={store.id}>
                     {store.name}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
-                Week Start Date
-              </label>
-              <input
+              <FieldLabel>Week Start Date</FieldLabel>
+              <Input
                 type="date"
                 value={weekStartDate}
                 onChange={(e) => setWeekStartDate(e.target.value)}
-                className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-slate-500"
               />
             </div>
           </div>
+        </Card>
+
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard label="Shifts" value={String(shifts.length)} />
+          <StatCard label="Available staff now" value={`${availableStaffCount}/${filteredStaff.length || 0}`} />
+          <StatCard label="All-rounders" value={String(filteredStaff.filter((s) => s.skill_level === "all_rounder").length)} />
+          <StatCard label="Publish status" value={scheduleWeek?.status || "draft"} />
         </div>
 
-        <div className="mt-8 grid gap-6 xl:grid-cols-[380px_minmax(0,1fr)_280px]">
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="text-lg font-semibold text-slate-900">Add Shift</h2>
+        <div className="grid gap-6 xl:grid-cols-[380px_minmax(0,1fr)_280px]">
+          <Card title="Add Shift" subtitle="Only available staff are selectable for the chosen day/time.">
 
             <form onSubmit={handleAddShift} className="mt-4 space-y-4">
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">
-                  Shift Date
-                </label>
-                <input
+                <FieldLabel>Shift Date</FieldLabel>
+                <Input
                   type="date"
                   value={shiftDate}
                   onChange={(e) => setShiftDate(e.target.value)}
-                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-500"
                 />
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">
-                  Department
-                </label>
-                <select
+                <FieldLabel>Department</FieldLabel>
+                <Select
                   value={department}
                   onChange={(e) =>
                     setDepartment(e.target.value as "front" | "kitchen")
                   }
-                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-500"
                 >
                   <option value="front">Front</option>
                   <option value="kitchen">Kitchen</option>
-                </select>
+                </Select>
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">
-                  Staff Member
-                </label>
-                <select
+                <FieldLabel>Staff Member</FieldLabel>
+                <Select
                   value={assignedStaffId}
                   onChange={(e) => setAssignedStaffId(e.target.value)}
-                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-500"
                 >
                   <option value="">Select staff</option>
                   {filteredStaff.map((member) => (
-                    <option
-                      key={member.id}
-                      value={member.id}
-                      disabled={!availabilityLoading && !isStaffAvailableForSelectedShift[member.id]}
-                    >
+                    <option key={member.id} value={member.id} disabled={!availabilityLoading && !isStaffAvailableForSelectedShift[member.id]}>
                       {member.name} · {member.skill_level}
                       {!availabilityLoading && !isStaffAvailableForSelectedShift[member.id]
                         ? " (Unavailable)"
                         : ""}
                     </option>
                   ))}
-                </select>
+                </Select>
                 <p className="mt-2 text-xs text-slate-500">
                   {availabilityLoading
                     ? "Loading availability..."
@@ -613,55 +607,49 @@ export default function SchedulePage() {
 
               <div className="grid gap-3 md:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">
-                    Start
-                  </label>
-                  <input
+                  <FieldLabel>Start</FieldLabel>
+                  <Input
                     type="time"
                     value={shiftStart}
                     onChange={(e) => setShiftStart(e.target.value)}
-                    className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-500"
                   />
                 </div>
 
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">
-                    End
-                  </label>
-                  <input
+                  <FieldLabel>End</FieldLabel>
+                  <Input
                     type="time"
                     value={shiftEnd}
                     onChange={(e) => setShiftEnd(e.target.value)}
-                    className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-500"
                   />
                 </div>
               </div>
 
-              <button
+              <Button
                 type="submit"
                 disabled={saving}
-                className="w-full rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
+                className="w-full"
               >
                 {saving ? "Saving..." : "Add Shift"}
-              </button>
+              </Button>
             </form>
-          </div>
+          </Card>
 
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+          <Card>
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-slate-900">Weekly Schedule</h2>
               <div className="flex items-center gap-3">
-                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
+                <Badge tone={scheduleWeek?.status === "published" ? "success" : "warning"}>
                   {scheduleWeek?.status || "draft"}
-                </span>
-                <button
+                </Badge>
+                <Button
                   type="button"
                   onClick={handleTogglePublishSchedule}
                   disabled={!scheduleWeek || loading}
-                  className="rounded-2xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
+                  variant={scheduleWeek?.status === "published" ? "secondary" : "primary"}
                 >
                   {scheduleWeek?.status === "published" ? "Unpublish" : "Publish"}
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -686,9 +674,7 @@ export default function SchedulePage() {
                       </div>
 
                       {dayShifts.length === 0 ? (
-                        <p className="mt-3 text-sm text-slate-600">
-                          No shifts added.
-                        </p>
+                        <EmptyState>No shifts added.</EmptyState>
                       ) : (
                         <div className="mt-3 space-y-2">
                           {dayShifts.map((shift) => (
@@ -706,13 +692,13 @@ export default function SchedulePage() {
                                 </p>
                               </div>
 
-                              <button
+                              <Button
                                 type="button"
                                 onClick={() => handleDeleteShift(shift.id)}
-                                className="rounded-2xl border border-red-200 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+                                variant="danger"
                               >
                                 Delete
-                              </button>
+                              </Button>
                             </div>
                           ))}
                         </div>
@@ -722,10 +708,9 @@ export default function SchedulePage() {
                 })}
               </div>
             )}
-          </div>
+          </Card>
 
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="text-lg font-semibold text-slate-900">Weekly Hours</h2>
+          <Card title="Weekly Hours" subtitle="Total planned hours across all active staff.">
 
             {staff.length === 0 ? (
               <p className="mt-4 text-sm text-slate-600">No staff found.</p>
@@ -751,8 +736,8 @@ export default function SchedulePage() {
                 ))}
               </div>
             )}
-          </div>
+          </Card>
         </div>
-    </div>
+    </PageContainer>
   );
 }

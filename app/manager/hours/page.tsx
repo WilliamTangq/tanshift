@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { Card, FieldLabel, Input, PageContainer, PageHeader } from "@/components/ui-system";
 
 type StaffProfile = {
   id: string;
@@ -132,28 +133,23 @@ export default function ManagerHoursPage() {
   }, [shifts]);
 
   return (
-    <div className="mx-auto max-w-6xl">
-      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Weekly hours</h1>
-          <p className="mt-2 text-sm text-slate-600">
-            Scheduled hours from published rosters for the week starting Monday.
-          </p>
-        </div>
-        <div className="w-full md:w-56">
-          <label className="mb-1 block text-sm font-medium text-slate-700">
-            Week start (Monday)
-          </label>
-          <input
+    <PageContainer>
+      <PageHeader
+        title="Weekly Hours"
+        description="Scheduled hours from published rosters for the selected week."
+        actions={
+          <div className="w-full sm:w-56">
+            <FieldLabel>Week start (Monday)</FieldLabel>
+            <Input
             type="date"
             value={weekStartDate}
             onChange={(e) => setWeekStartDate(e.target.value)}
-            className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-slate-500"
-          />
-        </div>
-      </div>
+            />
+          </div>
+        }
+      />
 
-      <div className="mt-8 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+      <Card>
         {loading ? (
           <p className="text-sm text-slate-600">Loading…</p>
         ) : info ? (
@@ -178,7 +174,7 @@ export default function ManagerHoursPage() {
             ))}
           </div>
         )}
-      </div>
-    </div>
+      </Card>
+    </PageContainer>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { Badge, Card, EmptyState, FieldLabel, PageContainer, PageHeader, Select } from "@/components/ui-system";
 
 type SubmissionRow = {
   id: string;
@@ -109,23 +110,16 @@ export default function ManagerAvailabilityPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl">
-        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Staff Availability</h1>
-            <p className="mt-2 text-sm text-slate-600">
-              Review submitted availability for each staff member.
-            </p>
-          </div>
-
-          <div className="w-full md:w-72">
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              Filter by Week Start
-            </label>
-            <select
+    <PageContainer>
+        <PageHeader
+          title="Staff Availability"
+          description="Review submitted availability by week and scan staffing windows quickly."
+          actions={
+            <div className="w-full sm:w-72">
+              <FieldLabel>Filter by Week Start</FieldLabel>
+              <Select
               value={selectedWeek}
               onChange={(e) => setSelectedWeek(e.target.value)}
-              className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-slate-500"
             >
               {uniqueWeeks.length === 0 && <option value="">No weeks found</option>}
               {uniqueWeeks.map((week) => (
@@ -133,17 +127,18 @@ export default function ManagerAvailabilityPage() {
                   {week}
                 </option>
               ))}
-            </select>
-          </div>
-        </div>
+              </Select>
+            </div>
+          }
+        />
 
-        <div className="mt-8 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+        <Card>
           {loading ? (
             <p className="text-sm text-slate-600">Loading availability...</p>
           ) : errorMessage ? (
             <p className="text-sm text-red-600">Error: {errorMessage}</p>
           ) : filteredSubmissions.length === 0 ? (
-            <p className="text-sm text-slate-600">No availability submissions found.</p>
+            <EmptyState>No availability submissions found.</EmptyState>
           ) : (
             <div className="space-y-4">
               {filteredSubmissions.map((submission) => {
@@ -165,9 +160,11 @@ export default function ManagerAvailabilityPage() {
                         <p className="text-sm text-slate-600">
                           Week Start: {submission.week_start_date}
                         </p>
-                        <p className="text-sm text-slate-600">
-                          Status: {submission.status}
-                        </p>
+                        <div className="mt-2">
+                          <Badge tone={submission.status === "submitted" ? "success" : "default"}>
+                            {submission.status}
+                          </Badge>
+                        </div>
                       </div>
 
                       <div className="text-sm text-slate-500">
@@ -183,9 +180,7 @@ export default function ManagerAvailabilityPage() {
                       </h3>
 
                       {submissionSlots.length === 0 ? (
-                        <p className="mt-2 text-sm text-slate-600">
-                          No slots found.
-                        </p>
+                        <p className="mt-2 text-sm text-slate-600">No slots found.</p>
                       ) : (
                         <div className="mt-3 flex flex-wrap gap-2">
                           {submissionSlots.map((slot) => (
@@ -212,7 +207,7 @@ export default function ManagerAvailabilityPage() {
               })}
             </div>
           )}
-        </div>
-    </div>
+        </Card>
+    </PageContainer>
   );
 }
