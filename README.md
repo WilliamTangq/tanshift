@@ -48,12 +48,6 @@ Once published, staff can review their assigned shifts and interact with the sys
 
 ---
 
-## Screenshots
-
-Screenshots of the system interface, including the manager dashboard, staff schedule view, and request management features, will be added in future updates.
-
----
-
 ## Future Development
 
 Future improvements will focus on enhancing usability and expanding system capabilities. Planned features include notification systems (email or push), mobile-first interface optimisation, payroll integration, and AI-assisted scheduling.
