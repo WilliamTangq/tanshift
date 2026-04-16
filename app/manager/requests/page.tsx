@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { Badge, Button, Card, EmptyState, FieldLabel, PageContainer, PageHeader, Select } from "@/components/ui-system";
 
 type StaffProfile = {
   id: string;
@@ -119,41 +120,35 @@ export default function ManagerRequestsPage() {
   }, [requests, filterStatus]);
 
   return (
-    <div className="mx-auto max-w-6xl">
-        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Requests</h1>
-            <p className="mt-2 text-sm text-slate-600">
-              Review and manage leave and swap requests from staff.
-            </p>
-          </div>
-
-          <div className="w-full md:w-56">
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              Filter Status
-            </label>
-            <select
+    <PageContainer>
+        <PageHeader
+          title="Requests"
+          description="Approve or reject leave and swap requests with full context."
+          actions={
+            <div className="w-full sm:w-56">
+              <FieldLabel>Filter Status</FieldLabel>
+              <Select
               value={filterStatus}
               onChange={(e) =>
                 setFilterStatus(
                   e.target.value as "all" | "pending" | "approved" | "rejected"
                 )
               }
-              className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-slate-500"
             >
               <option value="all">All</option>
               <option value="pending">Pending</option>
               <option value="approved">Approved</option>
               <option value="rejected">Rejected</option>
-            </select>
-          </div>
-        </div>
+              </Select>
+            </div>
+          }
+        />
 
-        <div className="mt-8 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+        <Card>
           {loading ? (
             <p className="text-sm text-slate-600">Loading requests...</p>
           ) : filteredRequests.length === 0 ? (
-            <p className="text-sm text-slate-600">No requests found.</p>
+            <EmptyState>No requests found.</EmptyState>
           ) : (
             <div className="space-y-4">
               {filteredRequests.map((request) => {
@@ -198,16 +193,18 @@ export default function ManagerRequestsPage() {
                         </p>
                       </div>
 
-                      <span
-                        className={`rounded-full px-3 py-1 text-xs font-medium ${
+                      <span>
+                      <Badge
+                        tone={
                           request.status === "approved"
-                            ? "bg-green-100 text-green-700"
+                            ? "success"
                             : request.status === "rejected"
-                            ? "bg-red-100 text-red-700"
-                            : "bg-amber-100 text-amber-700"
-                        }`}
+                            ? "danger"
+                            : "warning"
+                        }
                       >
                         {request.status}
+                      </Badge>
                       </span>
                     </div>
 
@@ -222,21 +219,21 @@ export default function ManagerRequestsPage() {
 
                     {request.status === "pending" && (
                       <div className="mt-4 flex gap-3">
-                        <button
+                        <Button
                           type="button"
                           onClick={() => handleUpdateStatus(request.id, "approved")}
-                          className="rounded-2xl bg-green-600 px-4 py-3 text-sm font-semibold text-white hover:opacity-90"
+                          variant="success"
                         >
                           Approve
-                        </button>
+                        </Button>
 
-                        <button
+                        <Button
                           type="button"
                           onClick={() => handleUpdateStatus(request.id, "rejected")}
-                          className="rounded-2xl bg-red-600 px-4 py-3 text-sm font-semibold text-white hover:opacity-90"
+                          variant="danger"
                         >
                           Reject
-                        </button>
+                        </Button>
                       </div>
                     )}
                   </div>
@@ -244,7 +241,7 @@ export default function ManagerRequestsPage() {
               })}
             </div>
           )}
-        </div>
-    </div>
+        </Card>
+    </PageContainer>
   );
 }

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { Card, PageContainer, PageHeader, StatCard } from "@/components/ui-system";
 
 type Store = {
   id: string;
@@ -67,21 +68,21 @@ export default function ManagerPage() {
   }, []);
 
   return (
-    <div className="mx-auto max-w-6xl">
-      <div className="rounded-3xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-6 shadow-sm sm:p-8">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-          TanShift
-        </p>
-        <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-          Manager dashboard
-        </h1>
-        <p className="mt-2 max-w-2xl text-sm text-slate-600 sm:text-base">
-          You have full visibility across stores, rosters, availability, and
-          requests. Jump into a workflow below.
-        </p>
+    <PageContainer>
+      <PageHeader
+        title="Manager Dashboard"
+        description="Monitor your operations, build schedules, and manage team workflows from one place."
+      />
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <StatCard label="Workflows" value="6" hint="Core manager modules" />
+        <StatCard label="Stores" value={loading ? "..." : String(stores.length)} />
+        <StatCard label="Primary View" value="Schedule" hint="Main planning surface" />
+        <StatCard label="Status" value="Live" hint="Supabase-backed" />
+        <StatCard label="Mobile" value="Ready" hint="Bottom nav supported" />
       </div>
 
-      <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {cards.map((card) => (
           <Link
             key={card.href}
@@ -103,8 +104,7 @@ export default function ManagerPage() {
         ))}
       </div>
 
-      <div className="mt-10 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-        <h2 className="text-lg font-semibold text-slate-900">Stores</h2>
+      <Card title="Stores" subtitle="Active locations connected to this workspace.">
 
         {loading && (
           <p className="mt-2 text-sm text-slate-600">Loading stores…</p>
@@ -133,7 +133,7 @@ export default function ManagerPage() {
             ))}
           </ul>
         )}
-      </div>
-    </div>
+      </Card>
+    </PageContainer>
   );
 }

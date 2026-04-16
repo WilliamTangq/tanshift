@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "@/lib/session-context";
+import { Card, PageContainer, PageHeader, StatCard } from "@/components/ui-system";
 
 type StaffProfile = {
   id: string;
@@ -57,28 +58,22 @@ export default function StaffHomePage() {
   const displayName = profile?.name || staffName || "Your profile";
 
   return (
-    <div className="mx-auto max-w-6xl">
-      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-          Staff home
-        </p>
-        <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-900">
-          Hi, {displayName}
-        </h1>
-        {loading ? (
-          <p className="mt-2 text-sm text-slate-600">Loading profile…</p>
-        ) : profile ? (
-          <p className="mt-2 text-sm text-slate-600">
-            {profile.department} · {profile.skill_level.replace("_", " ")}
-          </p>
-        ) : (
-          <p className="mt-2 text-sm text-slate-600">
-            You are signed in to your staff profile only.
-          </p>
-        )}
+    <PageContainer>
+      <PageHeader title={`Hi, ${displayName}`} description="Your schedule, availability, and requests in one place." />
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        <StatCard label="Role" value="Staff" />
+        <StatCard label="Department" value={profile?.department || "-"} />
+        <StatCard label="Skill" value={profile?.skill_level.replace("_", " ") || "-"} />
       </div>
 
-      <div className="mt-8 grid gap-4 sm:grid-cols-3">
+      {!loading && !profile && (
+        <Card>
+          <p className="text-sm text-slate-600">You are signed in to your staff profile only.</p>
+        </Card>
+      )}
+
+      <div className="grid gap-4 sm:grid-cols-3">
         {links.map((item) => (
           <Link
             key={item.href}
@@ -93,6 +88,6 @@ export default function StaffHomePage() {
           </Link>
         ))}
       </div>
-    </div>
+    </PageContainer>
   );
 }

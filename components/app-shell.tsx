@@ -76,49 +76,58 @@ export function ManagerShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-[var(--ts-bg)]">
-      <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-white/90 backdrop-blur-md">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
-          <div className="flex min-w-0 items-center gap-3">
-            <Link href="/manager" className="font-semibold tracking-tight text-slate-900">
-              TanShift
-            </Link>
-            <span className="hidden rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-violet-800 sm:inline">
-              Manager
-            </span>
-          </div>
-          <nav className="hidden flex-wrap items-center justify-end gap-1 lg:flex">
-            {items.map((item) => (
-              <NavLink
-                key={item.href}
-                href={item.href}
-                label={item.label}
-                active={
-                  item.href === "/manager"
-                    ? pathname === "/manager"
-                    : pathname.startsWith(item.href)
-                }
-              />
-            ))}
+    <div className="flex min-h-screen bg-[var(--ts-bg)]">
+      <aside className="hidden w-64 flex-col border-r border-slate-200 bg-white/90 p-5 lg:flex">
+        <Link href="/manager" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">TanShift</p>
+          <p className="mt-1 text-lg font-semibold text-slate-900">Manager</p>
+        </Link>
+        <nav className="mt-6 space-y-1">
+          {items.map((item) => (
+            <NavLink
+              key={item.href}
+              href={item.href}
+              label={item.label}
+              active={
+                item.href === "/manager" ? pathname === "/manager" : pathname.startsWith(item.href)
+              }
+            />
+          ))}
+        </nav>
+        <button
+          type="button"
+          onClick={handleSignOut}
+          className="mt-auto rounded-2xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+        >
+          Sign out
+        </button>
+      </aside>
+
+      <div className="flex min-h-screen min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-white/90 backdrop-blur-md">
+          <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
+            <div className="flex min-w-0 items-center gap-3">
+              <Link href="/manager" className="font-semibold tracking-tight text-slate-900 lg:hidden">
+                TanShift
+              </Link>
+              <p className="truncate text-sm font-medium text-slate-600">
+                {items.find((item) =>
+                  item.href === "/manager" ? pathname === "/manager" : pathname.startsWith(item.href)
+                )?.label || "Manager"}
+              </p>
+            </div>
             <button
               type="button"
               onClick={handleSignOut}
-              className="ml-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 lg:hidden"
             >
               Sign out
             </button>
-          </nav>
-          <button
-            type="button"
-            onClick={handleSignOut}
-            className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 lg:hidden"
-          >
-            Out
-          </button>
-        </div>
-      </header>
+          </div>
+        </header>
 
-      <main className="flex-1 px-4 py-6 pb-24 sm:px-6 lg:pb-8">{children}</main>
+        <main className="flex-1 px-4 py-6 pb-24 sm:px-6 lg:pb-8">{children}</main>
+      </div>
 
       <nav
         className="fixed bottom-0 left-0 right-0 z-20 border-t border-slate-200 bg-white/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 lg:hidden"
@@ -167,10 +176,9 @@ export function StaffShell({ children }: { children: React.ReactNode }) {
   const { staffName, signOut } = useSession();
 
   const items = [
-    { href: "/staff", label: "Home" },
-    { href: "/staff/schedule", label: "Schedule" },
-    { href: "/staff/availability", label: "Availability" },
-    { href: "/staff/requests", label: "Requests" },
+    { href: "/staff/schedule", label: "My Schedule" },
+    { href: "/staff/availability", label: "Submit Availability" },
+    { href: "/staff/requests", label: "My Requests" },
   ];
 
   function handleSignOut() {
@@ -183,7 +191,7 @@ export function StaffShell({ children }: { children: React.ReactNode }) {
       <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-white/90 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <div className="min-w-0">
-            <Link href="/staff" className="font-semibold tracking-tight text-slate-900">
+            <Link href="/staff/schedule" className="font-semibold tracking-tight text-slate-900">
               TanShift
             </Link>
             {staffName && (
@@ -210,9 +218,7 @@ export function StaffShell({ children }: { children: React.ReactNode }) {
               href={item.href}
               label={item.label}
               active={
-                item.href === "/staff"
-                  ? pathname === "/staff"
-                  : pathname.startsWith(item.href)
+                pathname.startsWith(item.href)
               }
             />
           ))}
@@ -232,9 +238,7 @@ export function StaffShell({ children }: { children: React.ReactNode }) {
               href={item.href}
               label={item.label}
               active={
-                item.href === "/staff"
-                  ? pathname === "/staff"
-                  : pathname.startsWith(item.href)
+                pathname.startsWith(item.href)
               }
             />
           ))}
