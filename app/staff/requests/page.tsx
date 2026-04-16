@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "@/lib/session-context";
+import { Badge, Button, Card, EmptyState, FieldLabel, PageContainer, PageHeader, Select, Textarea } from "@/components/ui-system";
 
 type StaffProfile = {
   id: string;
@@ -181,25 +182,21 @@ export default function StaffRequestsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl">
-        <h1 className="text-2xl font-bold text-slate-900">My requests</h1>
-        <p className="mt-2 text-sm text-slate-600">
-          Submit leave or swap requests for your published shifts.
-        </p>
+    <PageContainer>
+        <PageHeader
+          title="My Requests"
+          description="Submit leave or swap requests for your published shifts."
+        />
 
-        <div className="mt-8 grid gap-6 lg:grid-cols-[420px_minmax(0,1fr)]">
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="text-lg font-semibold text-slate-900">Submit request</h2>
+        <div className="grid gap-6 lg:grid-cols-[420px_minmax(0,1fr)]">
+          <Card title="Submit request" subtitle="Requests are sent to manager for review.">
 
             <form onSubmit={handleSubmit} className="mt-4 space-y-4">
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">
-                  Published Shift
-                </label>
-                <select
+                <FieldLabel>Published Shift</FieldLabel>
+                <Select
                   value={selectedShiftId}
                   onChange={(e) => setSelectedShiftId(e.target.value)}
-                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-500"
                 >
                   <option value="">Select shift</option>
                   {publishedShifts.map((shift) => (
@@ -207,32 +204,26 @@ export default function StaffRequestsPage() {
                       {shift.shift_date} · {shift.department} · {shift.shift_start} - {shift.shift_end}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">
-                  Request Type
-                </label>
-                <select
+                <FieldLabel>Request Type</FieldLabel>
+                <Select
                   value={requestType}
                   onChange={(e) => setRequestType(e.target.value as "leave" | "swap")}
-                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-500"
                 >
                   <option value="leave">Leave</option>
                   <option value="swap">Swap</option>
-                </select>
+                </Select>
               </div>
 
               {requestType === "swap" && (
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">
-                    Swap With
-                  </label>
-                  <select
+                  <FieldLabel>Swap With</FieldLabel>
+                  <Select
                     value={toStaffId}
                     onChange={(e) => setToStaffId(e.target.value)}
-                    className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-500"
                   >
                     <option value="">Select staff</option>
                     {staffList
@@ -242,20 +233,17 @@ export default function StaffRequestsPage() {
                           {staff.name} · {staff.department}
                         </option>
                       ))}
-                  </select>
+                  </Select>
                 </div>
               )}
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">
-                  Reason
-                </label>
-                <textarea
+                <FieldLabel>Reason</FieldLabel>
+                <Textarea
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
                   rows={4}
                   placeholder="Write your reason..."
-                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-500"
                 />
               </div>
 
@@ -268,17 +256,17 @@ export default function StaffRequestsPage() {
                 </div>
               )}
 
-              <button
+              <Button
                 type="submit"
                 disabled={saving}
-                className="w-full rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
+                className="w-full"
               >
                 {saving ? "Submitting..." : "Submit Request"}
-              </button>
+              </Button>
             </form>
-          </div>
+          </Card>
 
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+          <Card>
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-slate-900">My Request History</h2>
               <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
@@ -287,7 +275,7 @@ export default function StaffRequestsPage() {
             </div>
 
             {requests.length === 0 ? (
-              <p className="mt-4 text-sm text-slate-600">No requests yet.</p>
+              <EmptyState>No requests yet.</EmptyState>
             ) : (
               <div className="mt-4 space-y-3">
                 {requests.map((request) => (
@@ -305,17 +293,17 @@ export default function StaffRequestsPage() {
                         </p>
                       </div>
 
-                      <span
-                        className={`rounded-full px-3 py-1 text-xs font-medium ${
+                      <Badge
+                        tone={
                           request.status === "approved"
-                            ? "bg-green-100 text-green-700"
+                            ? "success"
                             : request.status === "rejected"
-                            ? "bg-red-100 text-red-700"
-                            : "bg-amber-100 text-amber-700"
-                        }`}
+                            ? "danger"
+                            : "warning"
+                        }
                       >
                         {request.status}
-                      </span>
+                      </Badge>
                     </div>
 
                     {request.reason && (
@@ -325,8 +313,8 @@ export default function StaffRequestsPage() {
                 ))}
               </div>
             )}
-          </div>
+          </Card>
         </div>
-    </div>
+    </PageContainer>
   );
 }

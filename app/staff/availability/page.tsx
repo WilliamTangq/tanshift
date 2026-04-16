@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "@/lib/session-context";
+import { Button, Card, FieldLabel, Input, PageContainer, PageHeader, Select, Textarea } from "@/components/ui-system";
 
 type StaffProfile = {
   id: string;
@@ -164,30 +165,22 @@ export default function StaffAvailabilityPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl">
-        <h1 className="text-2xl font-bold text-slate-900">Submit availability</h1>
-        <p className="mt-2 text-sm text-slate-600">
-          Submit next week&apos;s availability for yourself.
-        </p>
+    <PageContainer>
+        <PageHeader title="Submit Availability" description="Share your available time windows for the upcoming week." />
 
-        <div className="mt-8 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <Card>
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
-                Week Start Date (Monday)
-              </label>
-              <input
+              <FieldLabel>Week Start Date (Monday)</FieldLabel>
+              <Input
                 type="date"
                 value={weekStartDate}
                 onChange={(e) => setWeekStartDate(e.target.value)}
-                className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-500"
               />
             </div>
 
             <div>
-              <label className="mb-2 block text-sm font-medium text-slate-700">
-                Availability Slots
-              </label>
+              <FieldLabel>Availability Slots</FieldLabel>
 
               <div className="space-y-3">
                 {slots.map((slot, index) => (
@@ -195,68 +188,63 @@ export default function StaffAvailabilityPage() {
                     key={index}
                     className="grid gap-3 rounded-2xl border border-slate-200 p-4 md:grid-cols-[1fr_1fr_1fr_auto]"
                   >
-                    <select
+                    <Select
                       value={slot.day_of_week}
                       onChange={(e) =>
                         updateSlot(index, "day_of_week", Number(e.target.value))
                       }
-                      className="rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-500"
                     >
                       {DAYS.map((day) => (
                         <option key={day.value} value={day.value}>
                           {day.label}
                         </option>
                       ))}
-                    </select>
+                    </Select>
 
-                    <input
+                    <Input
                       type="time"
                       value={slot.start_time}
                       onChange={(e) =>
                         updateSlot(index, "start_time", e.target.value)
                       }
-                      className="rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-500"
                     />
 
-                    <input
+                    <Input
                       type="time"
                       value={slot.end_time}
                       onChange={(e) =>
                         updateSlot(index, "end_time", e.target.value)
                       }
-                      className="rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-500"
                     />
 
-                    <button
+                    <Button
                       type="button"
                       onClick={() => removeSlot(index)}
-                      className="rounded-2xl border border-red-200 px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50"
+                      variant="danger"
                     >
                       Remove
-                    </button>
+                    </Button>
                   </div>
                 ))}
               </div>
 
-              <button
+              <Button
                 type="button"
                 onClick={addSlot}
-                className="mt-3 rounded-2xl border border-slate-300 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                variant="secondary"
+                className="mt-3"
               >
                 Add Another Slot
-              </button>
+              </Button>
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
-                Note
-              </label>
-              <textarea
+              <FieldLabel>Note</FieldLabel>
+              <Textarea
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 rows={3}
                 placeholder="Optional note..."
-                className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-500"
               />
             </div>
 
@@ -268,15 +256,15 @@ export default function StaffAvailabilityPage() {
               </div>
             )}
 
-            <button
+            <Button
               type="submit"
               disabled={saving}
-              className="w-full rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
+              className="w-full"
             >
               {saving ? "Submitting..." : "Submit Availability"}
-            </button>
+            </Button>
           </form>
-        </div>
-    </div>
+        </Card>
+    </PageContainer>
   );
 }
